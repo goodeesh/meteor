@@ -23,15 +23,22 @@ export METEOR_PACKAGE_DIRS='packages/deprecated'
 
 echo "Starting test-in-console..."
 
-exec 3< <(./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee /dev/tty)
-EXEC_PID=$!
-trap "pkill -TERM -P $EXEC_PID; exit 1" SIGINT
+# Replace the process substitution with direct execution and tee to see all output
+./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+METEOR_PID=$!
+
+# Wait for the server to be ready
+while ! grep -q "test-in-console listening" test.log; do
+  sleep 1
+done
 
 sed '/test-in-console listening$/q' <&3
+
+echo "Starting puppeteer runner..."
 
 node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
 
-pkill -TERM -P $EXEC_PID
+pkill -TERM -P $METEOR_PID
 exit $STATUS
