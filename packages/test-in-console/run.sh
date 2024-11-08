@@ -18,7 +18,7 @@ if [ "$PUPPETEER_EXISTS" = "false" ]; then
   ./meteor npm install -g puppeteer@23.6.0
 fi
 
-export URL='http://127.0.0.1:4096/'
+export URL='http://localhost:4096/'
 export METEOR_PACKAGE_DIRS='packages/deprecated'
 
 echo "Starting test-in-console..."
@@ -31,8 +31,6 @@ METEOR_PID=$!
 while ! grep --line-buffered -q "test-in-console listening" test.log; do
   sleep 1
 done
-
-sed '/test-in-console listening$/q' <&3
 
 echo "Starting puppeteer runner..."
 
