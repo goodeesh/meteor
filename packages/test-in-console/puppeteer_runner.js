@@ -4,7 +4,7 @@ let testNumber = 0;
 
 async function runNextUrl(browser) {
   const page = await browser.newPage();
-  page.setDefaultNavigationTimeout(0);
+  page.setDefaultNavigationTimeout(120000);
 
   // page.on('console', msg => {
   //   console.log('PAGE LOG:', msg.text());
