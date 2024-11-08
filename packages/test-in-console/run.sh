@@ -24,11 +24,11 @@ export METEOR_PACKAGE_DIRS='packages/deprecated'
 echo "Starting test-in-console..."
 
 # Replace the process substitution with direct execution and tee to see all output
-./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
 METEOR_PID=$!
 
 # Wait for the server to be ready
-while ! grep -q "test-in-console listening" test.log; do
+while ! grep --line-buffered -q "test-in-console listening" test.log; do
   sleep 1
 done
 
