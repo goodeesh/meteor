@@ -11,11 +11,10 @@ jobs:
     timeout-minutes: 60
 
     env:
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       TEST_PACKAGES_EXCLUDE: stylus,roles
 
     steps:
-      - run: sudo apt-get update && sudo apt-get install -y libnss3 g++-12 chromium-browser
+      - run: sudo apt-get update && sudo apt-get install -y libnss3 g++-12
 
       - uses: actions/checkout@v3
 
