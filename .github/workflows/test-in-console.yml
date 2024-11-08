@@ -1,13 +1,9 @@
 name: Test In Console
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
+on: [pull_request]
 
 jobs:
-  build:
+  test-in-console:
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.head_ref }}-test-in-console
@@ -37,7 +33,5 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('meteor', '**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
-
-      - run: npm install
 
       - run: ./packages/test-in-console/run.sh

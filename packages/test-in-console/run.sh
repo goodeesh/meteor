@@ -21,7 +21,9 @@ fi
 export URL='http://127.0.0.1:4096/'
 export METEOR_PACKAGE_DIRS='packages/deprecated'
 
-exec 3< <(./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1)
+echo "Starting test-in-console..."
+
+exec 3< <(./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee /dev/tty)
 EXEC_PID=$!
 trap "pkill -TERM -P $EXEC_PID; exit 1" SIGINT
 
