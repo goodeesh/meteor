@@ -12,6 +12,9 @@ jobs:
 
     env:
       TEST_PACKAGES_EXCLUDE: stylus,roles
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
+      PUPPETEER_PRODUCT: firefox
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/firefox
 
     steps:
       - run: echo "deb http://archive.ubuntu.com/ubuntu jammy main universe" | sudo tee -a /etc/apt/sources.list

@@ -20,8 +20,7 @@ whereis chrome
 if [ "$PUPPETEER_EXISTS" = "false" ]; then
   echo "Installing puppeteer..."
   # Installs into dev_bundle/lib/node_modules/puppeteer.
-  PUPPETEER_PRODUCT=firefox ./meteor npm install -g puppeteer@23.6.0
-  ./meteor npx -g puppeteer browsers install firefox
+  ./meteor npm install -g puppeteer@23.6.0
 fi
 
 export URL='http://localhost:4096/'
