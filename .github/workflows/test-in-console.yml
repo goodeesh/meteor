@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   test-in-console:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     concurrency:
       group: ${{ github.head_ref }}-test-in-console
       cancel-in-progress: true
@@ -14,6 +14,9 @@ jobs:
       TEST_PACKAGES_EXCLUDE: stylus,roles
 
     steps:
+      - run: echo "deb http://archive.ubuntu.com/ubuntu jammy main universe" | sudo tee -a /etc/apt/sources.list
+      - run: sudo apt-get update && sudo apt-get install -y libnss3 g++-12
+
       - uses: actions/checkout@v3
 
       - uses: actions/setup-node@v3
