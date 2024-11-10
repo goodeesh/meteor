@@ -47,7 +47,10 @@ async function runNextUrl(browser) {
     return;
   }
 
-  await page.goto(process.env.URL);
+  await page.goto(process.env.URL, {
+    waitUntil: 'networkidle0',
+    timeout: 60000,
+  });
 
   async function poll() {
     if (await isDone(page)) {
@@ -144,6 +147,7 @@ async function runTests() {
     ],
     headless: 'new',
   });
+  console.log(`Using browser: ${puppeteer.executablePath()}`);
   console.log(`Using version: ${await browser.version()}`);
   await runNextUrl(browser)
 }

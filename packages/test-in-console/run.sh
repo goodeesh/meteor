@@ -24,8 +24,16 @@ export METEOR_PACKAGE_DIRS='packages/deprecated'
 echo "Starting test-in-console..."
 
 # Replace the process substitution with direct execution and tee to see all output
-stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+if [ "$(uname)" = "Darwin" ]; then
+  # On macOS, use script to unbuffer output
+  ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+else
+  # On Linux, use stdbuf
+  stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+fi
 METEOR_PID=$!
+
+trap "pkill -TERM -P $METEOR_PID" EXIT
 
 # Wait for the server to be ready
 while ! grep --line-buffered -q "test-in-console listening" test.log; do
