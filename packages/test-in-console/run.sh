@@ -46,7 +46,7 @@ curl $URL
 
 echo "Starting puppeteer runner..."
 
-node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
+DEBUG="puppeteer:*" node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
 
