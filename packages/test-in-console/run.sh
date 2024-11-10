@@ -15,6 +15,7 @@ PUPPETEER_EXISTS=`node -e "try { require('./dev_bundle/lib/node_modules/puppetee
 
 if [ "$PUPPETEER_EXISTS" = "false" ]; then
   echo "Installing puppeteer..."
+  ./meteor npm config set puppeteer_product=firefox
   # Installs into dev_bundle/lib/node_modules/puppeteer.
   ./meteor npm install -g puppeteer@23.6.0
 fi
