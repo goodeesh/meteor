@@ -36,12 +36,12 @@ METEOR_PID=$!
 
 trap "pkill -TERM -P $METEOR_PID" EXIT
 
+sleep 10
+
 # Wait for the server to be ready
 while ! grep --line-buffered -q "test-in-console listening" test.log; do
   sleep 1
 done
-
-sleep 10
 
 curl $URL
 
