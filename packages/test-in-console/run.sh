@@ -9,6 +9,7 @@ cd $(dirname $0)/../..
 export METEOR_HOME=`pwd`
 
 export PATH=$METEOR_HOME:$PATH
+export PUPPETEER_PRODUCT=firefox
 
 PUPPETEER_EXISTS=`node -e "try { require('./dev_bundle/lib/node_modules/puppeteer'); console.log('true'); } catch (e) { console.log('false'); }"`
 
@@ -46,7 +47,7 @@ curl $URL
 
 echo "Starting puppeteer runner..."
 
-DEBUG="puppeteer:*" node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
+node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
 

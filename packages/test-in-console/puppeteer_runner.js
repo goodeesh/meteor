@@ -140,12 +140,11 @@ async function runTests() {
 
   // --no-sandbox and --disable-setuid-sandbox must be disabled for CI compatibility
   const browser = await puppeteer.launch({
+    product: 'firefox',
     args: [
       '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-web-security',
     ],
-    headless: 'new',
+    headless: true,
   });
   console.log(`Using browser: ${puppeteer.executablePath()}`);
   console.log(`Using version: ${await browser.version()}`);
