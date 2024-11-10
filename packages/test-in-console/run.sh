@@ -32,6 +32,8 @@ while ! grep --line-buffered -q "test-in-console listening" test.log; do
   sleep 1
 done
 
+sleep 10
+
 echo "Starting puppeteer runner..."
 
 node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"

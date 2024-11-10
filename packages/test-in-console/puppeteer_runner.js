@@ -6,12 +6,10 @@ async function runNextUrl(browser) {
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(120000);
 
-  // page.on('console', msg => {
-  //   console.log('PAGE LOG:', msg.text());
-  // });
-
   page.on('console', async msg => {
     const text = msg.text();
+
+    console.log('PAGE LOG:', text);
 
     if (text.includes('Permissions policy violation')) {
       return
