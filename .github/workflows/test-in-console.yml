@@ -23,15 +23,4 @@ jobs:
         with:
           node-version: 22
 
-      - uses: actions/cache@v3
-        with:
-          path: |
-            ~/.npm
-            .meteor
-            .babel-cache
-            dev_bundle
-          key: ${{ runner.os }}-node-${{ hashFiles('meteor', '**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
       - run: ./packages/test-in-console/run.sh
