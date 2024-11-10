@@ -9,15 +9,19 @@ cd $(dirname $0)/../..
 export METEOR_HOME=`pwd`
 
 export PATH=$METEOR_HOME:$PATH
-export PUPPETEER_PRODUCT=firefox
 
 PUPPETEER_EXISTS=`node -e "try { require('./dev_bundle/lib/node_modules/puppeteer'); console.log('true'); } catch (e) { console.log('false'); }"`
 
+whereis firefox
+whereis chromium
+whereis google-chrome
+whereis chrome
+
 if [ "$PUPPETEER_EXISTS" = "false" ]; then
   echo "Installing puppeteer..."
-  ./meteor npm config set puppeteer_product=firefox
   # Installs into dev_bundle/lib/node_modules/puppeteer.
-  ./meteor npm install -g puppeteer@23.6.0
+  PUPPETEER_PRODUCT=firefox ./meteor npm install -g puppeteer@23.6.0
+  ./meteor npx -g puppeteer browsers install firefox
 fi
 
 export URL='http://localhost:4096/'
