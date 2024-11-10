@@ -18,13 +18,13 @@ if [ "$PUPPETEER_EXISTS" = "false" ]; then
   ./meteor npm install -g puppeteer@23.6.0
 fi
 
-export URL='http://localhost:4096/'
+export URL='http://0.0.0.0:4096/'
 export METEOR_PACKAGE_DIRS='packages/deprecated'
 
 echo "Starting test-in-console..."
 
 # Replace the process substitution with direct execution and tee to see all output
-stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
+stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --bind-ip 0.0.0.0 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} $1 | tee test.log &
 METEOR_PID=$!
 
 # Wait for the server to be ready
