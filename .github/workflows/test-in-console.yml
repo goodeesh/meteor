@@ -24,12 +24,16 @@ jobs:
           node-version: 22
 
       - run: |
+          pwd
+          ls -lah ~/
           sudo ufw allow 4096/tcp
           sudo ufw reload
 
       - uses: actions/cache/restore@v4
         with:
-          path: ./dev_bundle
+          path: |
+            ./dev_bundle
+            ~/.meteor
           key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
 
       - run: cat /etc/resolv.conf
@@ -45,5 +49,7 @@ jobs:
       - if: ${{ always() }}
         uses: actions/cache/save@v4
         with:
-          path: ./dev_bundle
+          path: |
+            ./dev_bundle
+            ~/.meteor
           key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
