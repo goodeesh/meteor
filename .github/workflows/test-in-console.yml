@@ -26,6 +26,11 @@ jobs:
           node-version: 22
       - run: npm install -g puppeteer@23.6.0
 
+      - uses: actions/download-artifact@v3
+        with:
+          name: dev-bundle
+          path: ./dev_bundle
+
       - run: cat /etc/resolv.conf
       
       - run: |
@@ -34,20 +39,10 @@ jobs:
           whereis google-chrome
           whereis chrome
 
-      - run: |
-          stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} | tee test.log &
-
-          export METEOR_PID=$!
-          
-          trap "pkill -TERM -P $METEOR_PID" EXIT
-          
-          while ! grep --line-buffered -q "test-in-console listening" test.log; do
-            sleep 1
-          done
-
-          exit 0
-
-      - run: |
-          xvfb-run -- node --trace-warnings "./packages/test-in-console/puppeteer_runner.js"
-          exit $?
+      - run: ./packages/test-in-console/run.sh
       
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: dev_bundle
+          path: ./dev_bundle

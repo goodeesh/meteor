@@ -68,6 +68,8 @@ function install_dev_bundle {
     TARBALL="dev_bundle_${PLATFORM}_${BUNDLE_VERSION}.tar.gz"
     BUNDLE_TMPDIR="$SCRIPT_DIR/dev_bundle.xxx"
 
+    echo "Installing dev bundle in $BUNDLE_TMPDIR"
+
     rm -rf "$BUNDLE_TMPDIR"
     mkdir "$BUNDLE_TMPDIR"
 
