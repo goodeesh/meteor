@@ -16,11 +16,37 @@ jobs:
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       PUPPETEER_PRODUCT: firefox
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/firefox
+      URL: http://localhost:4096/
+      METEOR_PACKAGE_DIRS: packages/deprecated
 
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 22
       - run: npm install -g puppeteer@23.6.0
-      - uses: actions/checkout@v3
-      - run: ./packages/test-in-console/run.sh
+
+      - run: |
+          cat /etc/resolv.conf
+
+      - run: |
+          whereis firefox
+          whereis chromium
+          whereis google-chrome
+          whereis chrome
+
+      - run: |
+          stdbuf -oL ./meteor test-packages --driver-package test-in-console -p 4096 --exclude-archs=web.browser.legacy,web.cordova --exclude ${TEST_PACKAGES_EXCLUDE:-''} | tee test.log &
+
+          export METEOR_PID=$!
+          
+          trap "pkill -TERM -P $METEOR_PID" EXIT
+          
+          while ! grep --line-buffered -q "test-in-console listening" test.log; do
+            sleep 1
+          done
+
+      - run: |
+          xvfb-run -- node --trace-warnings "./packages/test-in-console/puppeteer_runner.js"
+          exit $?
+      
