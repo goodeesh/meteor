@@ -51,7 +51,7 @@ curl $URL
 
 echo "Starting puppeteer runner..."
 
-DEBUG=sockjs* ./meteor node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
+DEBUG=sockjs* DISABLE_WEBSOCKETS=1 ./meteor node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
 
