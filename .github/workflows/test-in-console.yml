@@ -4,7 +4,10 @@ on: [pull_request]
 
 jobs:
   test-in-console:
-    runs-on: ghcr.io/puppeteer/puppeteer:latest
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/puppeteer/puppeteer:latest
+      options: --shm-size=1g
     concurrency:
       group: ${{ github.head_ref }}-test-in-console
       cancel-in-progress: true
