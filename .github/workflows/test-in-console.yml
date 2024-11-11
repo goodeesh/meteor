@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   test-in-console:
-    runs-on: ubuntu-22.04
+    runs-on: ghcr.io/puppeteer/puppeteer:latest
     concurrency:
       group: ${{ github.head_ref }}-test-in-console
       cancel-in-progress: true
@@ -18,9 +18,4 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 22
-
-      - run: xvfb-run -- ./packages/test-in-console/run.sh
+      - run: ./packages/test-in-console/run.sh
