@@ -51,6 +51,10 @@ curl $URL
 
 echo "Starting puppeteer runner..."
 
+curl http://localhost:4096/
+curl http://127.0.0.1:4096/
+curl http://0.0.0.0:4096/
+
 node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
