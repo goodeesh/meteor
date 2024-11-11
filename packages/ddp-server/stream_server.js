@@ -41,7 +41,6 @@ StreamServer = function () {
   var sockjs = Npm.require('sockjs');
   var serverOptions = {
     prefix: self.prefix,
-    log: function() {},
     // this is the default, but we code it explicitly because we depend
     // on it in stream_client:HEARTBEAT_TIMEOUT
     heartbeat_delay: 45000,
