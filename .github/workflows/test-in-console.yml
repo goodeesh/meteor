@@ -11,11 +11,10 @@ jobs:
     timeout-minutes: 60
 
     env:
-      DISPLAY: 127.0.0.53:0
       TEST_PACKAGES_EXCLUDE: stylus,roles
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
-      PUPPETEER_PRODUCT: firefox
-      PUPPETEER_EXECUTABLE_PATH: /usr/bin/firefox
+      PUPPETEER_PRODUCT: chromium
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
       URL: http://localhost:4096/
       METEOR_PACKAGE_DIRS: packages/deprecated
 
@@ -24,13 +23,14 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 22
-      - run: npm install -g puppeteer@23.6.0
 
-      - uses: actions/download-artifact@v3
+      - run: |
+          apt-get update && apt-get install -yq libgconf-2-4
+
+      - uses: actions/cache@v3
         with:
-          name: dev-bundle
           path: ./dev_bundle
-        continue-on-error: true
+          key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
 
       - run: cat /etc/resolv.conf
       
@@ -41,9 +41,9 @@ jobs:
           whereis chrome
 
       - run: ./packages/test-in-console/run.sh
-      
+
       - if: ${{ always() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/cache@v3
         with:
-          name: dev_bundle
           path: ./dev_bundle
+          key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
