@@ -30,6 +30,7 @@ jobs:
         with:
           name: dev-bundle
           path: ./dev_bundle
+        continue-on-error: true
 
       - run: cat /etc/resolv.conf
       
