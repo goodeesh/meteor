@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 60
 
     env:
+      DISPLAY: :0
       TEST_PACKAGES_EXCLUDE: stylus,roles
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       PUPPETEER_PRODUCT: firefox
