@@ -144,6 +144,7 @@ async function runTests() {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-web-security',
+      '--disable-dev-shm-usage'
     ],
     headless: true,
   });
