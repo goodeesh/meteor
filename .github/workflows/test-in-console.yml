@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      DISPLAY: :0
+      DISPLAY: 127.0.0.53:0
       TEST_PACKAGES_EXCLUDE: stylus,roles
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       PUPPETEER_PRODUCT: firefox
@@ -26,9 +26,8 @@ jobs:
           node-version: 22
       - run: npm install -g puppeteer@23.6.0
 
-      - run: |
-          cat /etc/resolv.conf
-
+      - run: cat /etc/resolv.conf
+      
       - run: |
           whereis firefox
           whereis chromium
@@ -45,6 +44,8 @@ jobs:
           while ! grep --line-buffered -q "test-in-console listening" test.log; do
             sleep 1
           done
+
+          exit 0
 
       - run: |
           xvfb-run -- node --trace-warnings "./packages/test-in-console/puppeteer_runner.js"
