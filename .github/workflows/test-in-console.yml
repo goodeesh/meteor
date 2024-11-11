@@ -5,9 +5,6 @@ on: [pull_request]
 jobs:
   test-in-console:
     runs-on: ubuntu-22.04
-    container:
-      image: ghcr.io/puppeteer/puppeteer:latest
-      options: --shm-size=1g
     concurrency:
       group: ${{ github.head_ref }}-test-in-console
       cancel-in-progress: true
@@ -16,9 +13,13 @@ jobs:
     env:
       TEST_PACKAGES_EXCLUDE: stylus,roles
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
-      PUPPETEER_PRODUCT: chromium
-      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_PRODUCT: firefox
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/firefox
 
     steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22
+      - run: npm install -g puppeteer@23.6.0
       - uses: actions/checkout@v3
       - run: ./packages/test-in-console/run.sh
