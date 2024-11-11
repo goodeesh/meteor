@@ -27,7 +27,7 @@ jobs:
       - run: |
           sudo apt-get update && sudo apt-get install -yq libgconf-2-4
 
-      - uses: actions/cache@v3
+      - uses: actions/cache/restore@v4
         with:
           path: ./dev_bundle
           key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
@@ -43,7 +43,7 @@ jobs:
       - run: ./packages/test-in-console/run.sh
 
       - if: ${{ always() }}
-        uses: actions/cache@v3
+        uses: actions/cache/save@v4
         with:
           path: ./dev_bundle
           key: ${{ runner.os }}-${{ hashFiles('meteor') }}-dev-bundle
