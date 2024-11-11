@@ -47,11 +47,9 @@ while ! grep --line-buffered -q "test-in-console listening" test.log; do
   sleep 1
 done
 
-curl $URL
-
 echo "Starting puppeteer runner..."
 
-DEBUG=sockjs* DISABLE_WEBSOCKETS=1 ./meteor node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
+./meteor node --trace-warnings "$METEOR_HOME/packages/test-in-console/puppeteer_runner.js"
 
 STATUS=$?
 

@@ -144,9 +144,11 @@ async function runTests() {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-web-security',
-      '--disable-dev-shm-usage'
+      '--disable-dev-shm-usage',
+      '--enable-logging=stderr',
+      '--v=1'
     ],
-    headless: true,
+    headless: 'new',
   });
   console.log(`Using browser: ${puppeteer.executablePath()}`);
   console.log(`Using version: ${await browser.version()}`);
