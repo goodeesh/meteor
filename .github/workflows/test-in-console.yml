@@ -13,14 +13,10 @@ jobs:
     env:
       TEST_PACKAGES_EXCLUDE: stylus,roles
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
-      PUPPETEER_PRODUCT: firefox
-      PUPPETEER_EXECUTABLE_PATH: /usr/bin/firefox
+      PUPPETEER_PRODUCT: chromium
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
 
     steps:
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-      
       - uses: actions/checkout@v3
 
       - uses: actions/setup-node@v3
