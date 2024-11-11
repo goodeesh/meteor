@@ -15,7 +15,6 @@ jobs:
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       PUPPETEER_PRODUCT: chromium
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
-      URL: http://localhost:4096/
       METEOR_PACKAGE_DIRS: packages/deprecated
 
     steps:
@@ -25,7 +24,8 @@ jobs:
           node-version: 22
 
       - run: |
-          sudo apt-get update && sudo apt-get install -yq libgconf-2-4
+          sudo ufw allow 4096/tcp
+          sudo ufw reload
 
       - uses: actions/cache/restore@v4
         with:
