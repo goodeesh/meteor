@@ -7,7 +7,7 @@ async function runNextUrl(browser) {
   page.setDefaultNavigationTimeout(120000);
 
   page.on('console', async msg => {
-    const text = msg.text();
+    let text = msg.text();
 
     console.log('PAGE LOG:', text);
 
@@ -17,7 +17,7 @@ async function runNextUrl(browser) {
 
     // this is a way to make sure the travis does not timeout
     // if the test is running for too long without any output to the console (10 minutes)
-    const text = msg.text();
+    text = msg.text();
     if (text.includes('Permissions policy violation')) {
       return;
     }
