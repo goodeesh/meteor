@@ -140,8 +140,7 @@ async function runTests() {
 
   const headlessOption = process.env.PUPPETEER_HEADLESS === 'true' ? true
     : process.env.PUPPETEER_HEADLESS === 'false' ? false
-      : process.env.PUPPETEER_HEADLESS === 'new' ? 'new'
-        : 'new';
+      : 'new';
 
   // --no-sandbox and --disable-setuid-sandbox must be disabled for CI compatibility
   const browser = await puppeteer.launch({
