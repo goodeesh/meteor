@@ -16,6 +16,7 @@ jobs:
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: true
       PUPPETEER_PRODUCT: chromium
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_HEADLESS: true
 
     steps:
       - uses: actions/checkout@v3

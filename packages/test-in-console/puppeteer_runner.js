@@ -138,6 +138,11 @@ async function getFailed(page) {
 async function runTests() {
   console.log(`Running test with Puppeteer at ${process.env.URL}`);
 
+  const headlessOption = process.env.PUPPETEER_HEADLESS === 'true' ? true
+    : process.env.PUPPETEER_HEADLESS === 'false' ? false
+      : process.env.PUPPETEER_HEADLESS === 'new' ? 'new'
+        : 'new';
+
   // --no-sandbox and --disable-setuid-sandbox must be disabled for CI compatibility
   const browser = await puppeteer.launch({
     args: [
@@ -148,7 +153,7 @@ async function runTests() {
       '--enable-logging=stderr',
       '--v=1'
     ],
-    headless: 'new',
+    headless: headlessOption,
   });
   console.log(`Using browser: ${puppeteer.executablePath()}`);
   console.log(`Using version: ${await browser.version()}`);
