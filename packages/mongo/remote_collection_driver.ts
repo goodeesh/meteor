@@ -121,6 +121,7 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   // Initialize database connection on startup
   Meteor.startup(async (): Promise<void> => {
+    const isDevelopment = Meteor.isDevelopment;
     return new Promise((resolve, reject) => {
       driver.mongo.client
         .connect()
@@ -128,9 +129,9 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
         .catch((error) => {
           // Fix an issue with development mode crashing on idle
           // https://github.com/meteor/meteor/issues/13108
-          if (
-            Meteor.isDevelopment &&
-            error?.message?.includes("PoolClearedOnNetworkError")
+          if (isDevelopment &&
+            (error?.message?.includes("PoolClearedOnNetworkError") ||
+              error?.message?.includes("server monitor timeout"))
           ) {
             return;
           }
