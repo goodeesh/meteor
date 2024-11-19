@@ -121,11 +121,22 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   // Initialize database connection on startup
   Meteor.startup(async (): Promise<void> => {
-    try {
-      await driver.mongo.client.connect();
-    } catch (error) {
-      console.log("Failed to connect to MongoDB :(", error);
-    }
+    return new Promise((resolve, reject) => {
+      driver.mongo.client
+        .connect()
+        .then(resolve)
+        .catch((error) => {
+          // Fix an issue with development mode crashing on idle
+          // https://github.com/meteor/meteor/issues/13108
+          if (
+            Meteor.isDevelopment &&
+            error?.message?.includes("PoolClearedOnNetworkError")
+          ) {
+            return;
+          }
+          reject(error);
+        });
+    });
   });
 
   return driver;
