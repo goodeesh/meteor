@@ -1,8 +1,3 @@
----
-meteor_version: 3.0.4
-node_version: 20.18.0
-npm_version: 10.8.2
----
 # Meteor 3.0 Migration Guide
 
 :::info You are reading the migration guide for Meteor 3!
@@ -16,24 +11,24 @@ This guide is for users with Meteor 2.x projects understand the changes between 
 
 Meteor 3.0 is currently in its official version!
 
-**Latest version:** `{{ $frontmatter.meteor_version }}` <br/>
-**Node.js version:** `{{ $frontmatter.node_version }} LTS` <br/>
-**NPM version:** `{{ $frontmatter.npm_version }}`
+**Latest version:** `3.0.4` <br/>
+**Node.js version:** `20.18.0 LTS` <br/>
+**NPM version:** `10.8.2`
 
 ## How to try Meteor 3.0?
 
 You can create a new Meteor 3.0 project by running the command below:
 
-```bash-vue
-  meteor create my-new-project --release {{ $frontmatter.meteor_version }}
+```bash
+meteor create my-new-project --release 3.0.4
 ```
 
 ## How to upgrade from Meteor 2.x?
 
 You can upgrade your Meteor 2.x project by running the command below inside your project folder:
 
-```bash-vue
-meteor update --release {{ $frontmatter.meteor_version }}
+```bash
+meteor update --release 3.0.4
 meteor reset # resets project to a fresh state
 ```
 
@@ -58,7 +53,6 @@ This guide covers the necessary topics for migrating your application from Meteo
 
 - [Frequently Asked Questions](./frequently-asked-questions/index.md), answers to common questions.
 - [Breaking Changes](./breaking-changes/index.md), an overview of the changes that will affect your application.
-
   - [Meteor.call x Meteor.callAsync](./breaking-changes/call-x-callAsync.md), why should you change your methods to use `Async` methods.
   - [Upgrading packages](./breaking-changes/upgrading-packages.md), how to upgrade your packages to the be compatible with Meteor v3.
 
@@ -75,15 +69,14 @@ This guide covers the necessary topics for migrating your application from Meteo
 
 We are aware of these articles and guides to assist with your migration:
 
-- [Prepare your Meteor.js project for the big 3.0 release](https://dev.to/jankapunkt/prepare-your-meteorjs-project-for-the-big-30-release-14bf)
-- [Gradually upgrading a Meteor.js project to 3.0](https://dev.to/meteor/gradually-upgrading-a-meteorjs-project-to-30-5aj0)
-- [Meteor 3.0 Migration Guide, from Daniel](https://docs.google.com/document/d/1XxHE5MQaS0-85HQ-bkiXxmGlYi41ggkX3F-9Rjb9HhE/edit#heading=h.65xi3waq9bb)
-- [Illustreets Migration Guide, large SaaS migrated to 3.0](https://forums.meteor.com/t/large-saas-migrated-to-3-0/61113) & their how-to [post](https://forums.meteor.com/t/meteor-3-0-beta-6-is-out/61277/12)
-
+ - [Prepare your Meteor.js project for the big 3.0 release](https://dev.to/jankapunkt/prepare-your-meteorjs-project-for-the-big-30-release-14bf)
+ - [Gradually upgrading a Meteor.js project to 3.0](https://dev.to/meteor/gradually-upgrading-a-meteorjs-project-to-30-5aj0)
+ - [Meteor 3.0 Migration Guide, from Daniel](https://docs.google.com/document/d/1XxHE5MQaS0-85HQ-bkiXxmGlYi41ggkX3F-9Rjb9HhE/edit#heading=h.65xi3waq9bb)
+ - [Illustreets Migration Guide, large SaaS migrated to 3.0](https://forums.meteor.com/t/large-saas-migrated-to-3-0/61113) & their how-to [post](https://forums.meteor.com/t/meteor-3-0-beta-6-is-out/61277/12)
+ 
 ### Videos
 
 Migrating apps to Meteor 3.0:
-
 - TicTacToe & others: [YouTube](https://www.youtube.com/watch?v=MtStd0aeyQA)
 - Complex Svelte todo list & others: [YouTube](https://www.youtube.com/watch?v=-XW8xwSk-zU)
 - Meteor University with v3
