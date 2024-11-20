@@ -131,7 +131,8 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
           // https://github.com/meteor/meteor/issues/13108
           if (isDevelopment &&
             (error?.message?.includes("PoolClearedOnNetworkError") ||
-              error?.message?.includes("server monitor timeout"))
+              error?.message?.includes("server monitor timeout") ||
+              error?.message?.includes("MongoNetworkTimeoutError"))
           ) {
             return;
           }
