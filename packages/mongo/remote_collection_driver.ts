@@ -119,26 +119,27 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   const driver = new RemoteCollectionDriver(mongoUrl, connectionOptions);
 
-  // Initialize database connection on startup
+  const connectToRemoteDatabase = async (retries = 3) => {
+    if (retries === 0) throw new Error("Failed to connect to remote database");
+    try {
+      await driver.mongo.client.connect();
+    } catch (error) {
+      // Fix an issue with development mode crashing on idle
+      // https://github.com/meteor/meteor/issues/13108
+      if (
+        Meteor.isDevelopment &&
+        (error?.message?.includes("PoolClearedOnNetworkError") ||
+          error?.message?.includes("server monitor timeout") ||
+          error?.message?.includes("MongoNetworkTimeoutError"))
+      ) {
+        return await connectToRemoteDatabase(retries - 1);  // Do reconnect for these specific errors in development mode
+      }
+      throw error; // Re-throw the error for other cases
+    }
+  };
+// Initialize database connection on startup
   Meteor.startup(async (): Promise<void> => {
-    const isDevelopment = Meteor.isDevelopment;
-    return new Promise((resolve, reject) => {
-      driver.mongo.client
-        .connect()
-        .then(resolve)
-        .catch((error) => {
-          // Fix an issue with development mode crashing on idle
-          // https://github.com/meteor/meteor/issues/13108
-          if (isDevelopment &&
-            (error?.message?.includes("PoolClearedOnNetworkError") ||
-              error?.message?.includes("server monitor timeout") ||
-              error?.message?.includes("MongoNetworkTimeoutError"))
-          ) {
-            return;
-          }
-          reject(error);
-        });
-    });
+    return await connectToRemoteDatabase();
   });
 
   return driver;
