@@ -119,8 +119,8 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   const driver = new RemoteCollectionDriver(mongoUrl, connectionOptions);
 
-  const connectToRemoteDatabase = async (retries = 3) => {
-    if (retries === 0) throw new Error("Failed to connect to remote database");
+  const connectToRemoteDatabase = async (retries = 3, _error) => {
+    if (retries === 0) throw _error;
     try {
       await driver.mongo.client.connect();
     } catch (error) {
@@ -132,7 +132,7 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
           error?.message?.includes("server monitor timeout") ||
           error?.message?.includes("MongoNetworkTimeoutError"))
       ) {
-        return await connectToRemoteDatabase(retries - 1);  // Do reconnect for these specific errors in development mode
+        return await connectToRemoteDatabase(retries - 1, error);  // Do reconnect for these specific errors in development mode
       }
       throw error; // Re-throw the error for other cases
     }
