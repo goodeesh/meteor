@@ -47,6 +47,8 @@ provide('toggle-appearance', async ({ clientX: x, clientY: y }: MouseEvent) => {
     }
   )
 })
+
+const inLatestDeployedDoc = () => isClient && window.location.href.startsWith("https://docs.meteor.com/")
 </script>
 
 <template>
