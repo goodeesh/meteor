@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GoToLatest from './GoToLatest.vue'
 import { useData, useRouter } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import { nextTick, provide } from 'vue'
@@ -52,7 +53,11 @@ const inLatestDeployedDoc = () => isClient && window.location.href.startsWith("h
 </script>
 
 <template>
-  <DefaultTheme.Layout />
+  <DefaultTheme.Layout>
+    <template #doc-before v-if="!inLatestDeployedDoc()">
+      <GoToLatest />
+    </template>
+  </DefaultTheme.Layout>
 </template>
 
 <style>
