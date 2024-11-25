@@ -27,6 +27,7 @@ const createExpressApp = () => {
   // these headers come from these docs: https://expressjs.com/en/api.html#app.settings.table
   app.set('x-powered-by', false);
   app.set('etag', false);
+  app.set('query parser', qs.parse);
   return app;
 };
 export const WebApp = {};
@@ -296,7 +297,7 @@ WebApp._timeoutAdjustmentRequestCallback = function(req, res) {
   res.on('finish', function() {
     res.setTimeout(SHORT_SOCKET_TIMEOUT);
   });
-  for(var l of finishListeners) {
+  for(const l of Object.values(finishListeners) || []) {
     res.on('finish', l);
   }
 };
@@ -450,13 +451,14 @@ async function getBoilerplateAsync(request, arch) {
     return true;
   });
   runtimeConfig.isUpdatedByArch[arch] = false;
+  const { dynamicHead, dynamicBody } = request;
   const data = Object.assign(
     {},
     boilerplate.baseData,
     {
       htmlAttributes: getHtmlAttributes(request),
     },
-    _.pick(request, 'dynamicHead', 'dynamicBody')
+    { dynamicHead, dynamicBody }
   );
 
   let madeChanges = false;
@@ -540,9 +542,8 @@ WebAppInternals.generateBoilerplateInstance = function(
           return pathJoin(archPath[arch], itemPath);
         },
         baseDataExtension: {
-          additionalStaticJs: _.map(additionalStaticJs || [], function(
-            contents,
-            pathname
+          additionalStaticJs: (Object.entries(additionalStaticJs) || []).map(function(
+            [pathname, contents]
           ) {
             return {
               pathname: pathname,
@@ -619,7 +620,7 @@ WebAppInternals.staticFilesMiddleware = async function(
   };
 
   if (
-    _.has(additionalStaticJs, pathname) &&
+    pathname in additionalStaticJs &&
     !WebAppInternals.inlineScriptsAllowed()
   ) {
     serveStaticJs(additionalStaticJs[pathname]);
@@ -1080,16 +1081,6 @@ async function runWebAppServer() {
     res.write('Not a proxy');
     res.end();
   });
-
-  // Parse the query string into res.query. Used by oauth_server, but it's
-  // generally pretty handy..
-  //
-  // Do this before the next middleware destroys req.url if a path prefix
-  // is set to close #10111.
-  // app.use(function(request, response, next) {
-  //   request.query = qs.parse(new URL(request.url).search);
-  //   next();
-  // });
 
   function getPathParts(path) {
     const parts = path.split('/');

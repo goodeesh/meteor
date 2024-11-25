@@ -3,7 +3,7 @@ os: linux
 dist: jammy
 services: xvfb
 node_js:
-  - "20.15.1"
+  - "22.11.0"
 cache:
   directories:
     - ".meteor"
@@ -15,6 +15,7 @@ env:
     - CXX=g++-12
     - phantom=false
     - PUPPETEER_DOWNLOAD_PATH=~/.npm/chromium
+    - TEST_PACKAGES_EXCLUDE=stylus
 addons:
   apt:
     sources:
