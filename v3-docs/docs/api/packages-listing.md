@@ -123,6 +123,7 @@
 ### [reload](https://github.com/meteor/meteor/tree/devel/packages/reload) {#reload}
 ### [reload-safetybelt](https://github.com/meteor/meteor/tree/devel/packages/reload-safetybelt) {#reload-safetybelt}
 ### [retry](https://github.com/meteor/meteor/tree/devel/packages/retry) {#retry}
+### [roles](https://github.com/meteor/meteor/tree/devel/packages/roles) {#roles}
 ### [routepolicy](https://github.com/meteor/meteor/tree/devel/packages/routepolicy) {#routepolicy}
 ### [server-render](https://github.com/meteor/meteor/tree/devel/packages/server-render) {#server-render}
 ### [service-configuration](https://github.com/meteor/meteor/tree/devel/packages/service-configuration) {#service-configuration}
