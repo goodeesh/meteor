@@ -132,6 +132,7 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
           error?.message?.includes('server monitor timeout') ||
           error?.message?.includes('MongoNetworkTimeoutError'))
       ) {
+        await Meteor._sleepForMs(100);
         return await connectToRemoteDatabase(retries - 1, error);  // Do reconnect for these specific errors in development mode
       }
       throw error; // Re-throw the error for other cases
