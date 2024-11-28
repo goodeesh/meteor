@@ -85,10 +85,6 @@ export const MongoConnection = function (url, options) {
     }
   }));
 
-  self.client.on('connectionPoolCleared', Meteor.bindEnvironment(event => {
-    console.log('connectionPoolCleared', event);
-  }));
-
   if (options.oplogUrl && ! Package['disable-oplog']) {
     self._oplogHandle = new OplogHandle(options.oplogUrl, self.db.databaseName);
     self._docFetcher = new DocFetcher(self);

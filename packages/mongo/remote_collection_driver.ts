@@ -119,7 +119,7 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   const driver = new RemoteCollectionDriver(mongoUrl, connectionOptions);
 
-  const connectToRemoteDatabase = async (retries = 9999, _error = new Error('Failed to connect to remote database')) => {
+  const connectToRemoteDatabase = async (retries = 3, _error = new Error('Failed to connect to remote database')) => {
     if (retries === 0) throw _error;
     try {
       await driver.mongo.client.connect();
@@ -132,7 +132,6 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
           error?.message?.includes('server monitor timeout') ||
           error?.message?.includes('MongoNetworkTimeoutError'))
       ) {
-        await Meteor._sleepForMs(100);
         return await connectToRemoteDatabase(retries - 1, error);  // Do reconnect for these specific errors in development mode
       }
       throw error; // Re-throw the error for other cases
@@ -140,6 +139,11 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
   };
 // Initialize database connection on startup
   Meteor.startup(async (): Promise<void> => {
+    driver.mongo.client.on('connectionPoolCleared', async event => {
+      console.log('connectionPoolCleared', event);
+      return await connectToRemoteDatabase();
+    });
+
     return await connectToRemoteDatabase();
   });
 
