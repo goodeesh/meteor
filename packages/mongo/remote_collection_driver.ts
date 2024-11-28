@@ -119,7 +119,7 @@ MongoInternals.defaultRemoteCollectionDriver = once((): RemoteCollectionDriver =
 
   const driver = new RemoteCollectionDriver(mongoUrl, connectionOptions);
 
-  const connectToRemoteDatabase = async (retries = 3, _error = new Error('Failed to connect to remote database')) => {
+  const connectToRemoteDatabase = async (retries = 9999, _error = new Error('Failed to connect to remote database')) => {
     if (retries === 0) throw _error;
     try {
       await driver.mongo.client.connect();
