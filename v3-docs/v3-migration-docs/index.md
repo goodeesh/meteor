@@ -1,7 +1,7 @@
 ---
-meteor_version: 3.0.4
-node_version: 20.18.0
-npm_version: 10.8.2
+meteor_version: 3.1.0
+node_version: 22.11.0
+npm_version: 10.9.0
 ---
 # Meteor 3.0 Migration Guide
 

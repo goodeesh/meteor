@@ -67,4 +67,5 @@ Package.onTest((api) => {
   api.addFiles("test/async_stubs/client.js", "client");
   api.addFiles("test/async_stubs/server_setup.js", "server");
   api.addFiles("test/livedata_callAsync_tests.js");
+  api.addFiles("test/allow_deny_setup.js");
 });
