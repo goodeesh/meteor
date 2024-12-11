@@ -1,4 +1,5 @@
 import { defineConfig } from "vitepress";
+import metadata from "../generators/meteor-versions/metadata.generated";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -127,6 +128,22 @@ export default defineConfig({
       },
       { text: "API", link: "/api/" },
       { text: "Galaxy Cloud", link: "https://www.meteor.com/cloud" },
+      {
+        text: metadata.currentVersion,
+        items: metadata.versions.reverse().map((v) => {
+          if (v.isCurrent) {
+            return {
+              text: `${v.version} (Current)`,
+              link: "/",
+              activeMatch: "/",
+            };
+          }
+          return {
+            text: v.version,
+            link: v.url,
+          };
+        }),
+      },
     ],
     sidebar: [
       {
@@ -306,6 +323,10 @@ export default defineConfig({
             link: "/packages/hot-module-replacement",
           },
           {
+            text: "roles",
+            link: "/packages/roles",
+          },
+          {
             text: "less",
             link: "/packages/less",
           },
@@ -328,6 +349,10 @@ export default defineConfig({
           {
             text: "random",
             link: "/packages/random",
+          },
+          {
+            text: "react-meteor-data",
+            link: "/packages/react-meteor-data",
           },
           {
             text: "server-render",
@@ -353,11 +378,13 @@ export default defineConfig({
             link: "/packages/packages-listing",
             text: "Maintained Packages",
           },
-          {
-            link: "packages/community-packages",
-            text: "Community Packages",
-          },
         ],
+        collapsed: true,
+      },
+      {
+        text: "Community Packages",
+        link: "/community-packages/index",
+        items: [],
         collapsed: true,
       },
       {
@@ -368,10 +395,6 @@ export default defineConfig({
             link: "/troubleshooting/expired-certificate",
           },
           { text: "Windows", link: "/troubleshooting/windows" },
-          {
-            text: "Known issues in 2.13",
-            link: "/troubleshooting/known-issues",
-          },
         ],
         collapsed: true,
       },
