@@ -17,6 +17,7 @@ import {
 import cluster from 'node:cluster';
 import { execSync } from 'node:child_process';
 import { URL } from 'node:url';
+import qs from 'qs';
 
 const SHORT_SOCKET_TIMEOUT = 5 * 1000;
 const LONG_SOCKET_TIMEOUT = 120 * 1000;
