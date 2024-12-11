@@ -516,7 +516,8 @@ async function doRunCommand(options) {
           open(`http://localhost:${options.port}`)
         }
       }
-    }
+    }, 
+    open: options.open,
   });
 }
 
@@ -1373,7 +1374,7 @@ ${Console.command("meteor build ../output")}`,
       files.pathJoin(outputPath, 'bundle')) :
       files.pathJoin(buildDir, 'bundle');
 
-  await stats.recordPackages({
+  stats.recordPackages({
     what: "sdk.bundle",
     projectContext: projectContext
   });

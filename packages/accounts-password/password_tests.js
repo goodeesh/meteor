@@ -701,7 +701,7 @@ if (Meteor.isClient) (() => {
     // accounts-base/accounts_tests.js, but this is where the tests that
     // actually log in are.
     async function (test, expect) {
-      const clientUser = await Meteor.user();
+      const clientUser = await Meteor.userAsync();
       Accounts.connection.call('testMeteorUser', expect((err, result) => {
         test.equal(result._id, clientUser._id);
         test.equal(result.username, clientUser.username);
@@ -1212,10 +1212,10 @@ if (Meteor.isServer) (() => {
 
   // This test properly belongs in accounts-base/accounts_tests.js, but
   // this is where the tests that actually log in are.
-  Tinytest.addAsync('accounts - user() out of context', async test => {
+  Tinytest.addAsync('accounts - userAsync() out of context', async test => {
     await test.throwsAsync(
       async () =>
-        await Meteor.user()
+        await Meteor.userAsync()
     );
     await Meteor.users.removeAsync({});
   });
@@ -1309,7 +1309,7 @@ if (Meteor.isServer) (() => {
               password: hashPassword("new-password")
             }
           ),
-        /Incorrect password/);
+        /Something went wrong. Please check your credentials./);
     });
 
   Tinytest.addAsync(
@@ -1388,7 +1388,7 @@ if (Meteor.isServer) (() => {
             password: hashPassword("new-password")
           }
         ),
-        /Incorrect password/);
+        /Something went wrong. Please check your credentials./);
     });
 
   Tinytest.addAsync('forgotPassword - different error messages returned depending' +
@@ -1896,4 +1896,32 @@ if (Meteor.isServer) (() => {
     test.equal(url.searchParams.get('test'), extraParams.test);
   });
 
+  Tinytest.addAsync('passwords - createUserAsync', async test => {
+    const username = Random.id();
+    const email = `${username}-intercept@example.com`;
+    const password = 'password';
+
+    const userId = await Accounts.createUserAsync({
+      username: username,
+      email: email,
+      password: password
+    });
+
+    test.isTrue(userId, 'User ID should be returned');
+    const user = await Meteor.users.findOneAsync(userId);
+    test.equal(user.username, username, 'Username should match');
+    test.equal(user.emails[0].address, email, 'Email should match');
+
+    Accounts.config({
+      ambiguousErrorMessages: false,
+    })
+
+    await test.throwsAsync(async () => {
+      await Accounts.createUserAsync({
+        username: username,
+        email: email,
+        password: password
+      });
+    }, 'already exists');
+  });
 })();

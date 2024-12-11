@@ -1,5 +1,12 @@
+import has from 'lodash.has';
+import isEmpty from 'lodash.isempty';
 import { oplogV2V1Converter } from "./oplog_v2_converter";
 import { check, Match } from 'meteor/check';
+import { CursorDescription } from './cursor_description';
+import { forEachTrigger, listenAll } from './mongo_driver';
+import { Cursor } from './cursor';
+import LocalCollection from 'meteor/minimongo/local_collection';
+import { idForOp } from './oplog_tailing';
 
 var PHASE = {
   QUERYING: "QUERYING",
@@ -23,12 +30,22 @@ var finishIfNeedToPollQuery = function (f) {
 
 var currentId = 0;
 
-// OplogObserveDriver is an alternative to PollingObserveDriver which follows
-// the Mongo operation log instead of just re-polling the query. It obeys the
-// same simple interface: constructing it starts sending observeChanges
-// callbacks (and a ready() invocation) to the ObserveMultiplexer, and you stop
-// it by calling the stop() method.
-OplogObserveDriver = function (options) {
+/**
+ * @class OplogObserveDriver
+ * An alternative to PollingObserveDriver which follows the MongoDB operation log
+ * instead of re-polling the query.
+ *
+ * Characteristics:
+ * - Follows the MongoDB operation log
+ * - Directly observes database changes
+ * - More efficient than polling for most use cases
+ * - Requires access to MongoDB oplog
+ *
+ * Interface:
+ * - Construction initiates observeChanges callbacks and ready() invocation to the ObserveMultiplexer
+ * - Observation can be terminated via the stop() method
+ */
+export const OplogObserveDriver = function (options) {
   const self = this;
   self._usesOplog = true;  // tests look at this
 
@@ -111,12 +128,9 @@ OplogObserveDriver = function (options) {
 
   self._requeryWhenDoneThisQuery = false;
   self._writesToCommitWhenWeReachSteady = [];
-
-
-
  };
 
-_.extend(OplogObserveDriver.prototype, {
+Object.assign(OplogObserveDriver.prototype, {
   _init: async function() {
     const self = this;
 
@@ -207,7 +221,7 @@ _.extend(OplogObserveDriver.prototype, {
   _addPublished: function (id, doc) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
-      var fields = _.clone(doc);
+      var fields = Object.assign({}, doc);
       delete fields._id;
       self._published.set(id, self._sharedProjectionFn(doc));
       self._multiplexer.added(id, self._projectionFn(fields));
@@ -296,7 +310,7 @@ _.extend(OplogObserveDriver.prototype, {
       var projectedOld = self._projectionFn(oldDoc);
       var changed = DiffSequence.makeChangedFields(
         projectedNew, projectedOld);
-      if (!_.isEmpty(changed))
+      if (!isEmpty(changed))
         self._multiplexer.changed(id, changed);
     });
   },
@@ -634,7 +648,7 @@ _.extend(OplogObserveDriver.prototype, {
         // selector)?
         // oplog format has changed on mongodb 5, we have to support both now
         // diff is the format in Mongo 5+ (oplog v2)
-        var isReplace = !_.has(op.o, '$set') && !_.has(op.o, 'diff') && !_.has(op.o, '$unset');
+        var isReplace = !has(op.o, '$set') && !has(op.o, 'diff') && !has(op.o, '$unset');
         // If this modifier modifies something inside an EJSON custom type (ie,
         // anything with EJSON$), then we can't try to use
         // LocalCollection._modify, since that just mutates the EJSON encoding,
@@ -646,7 +660,7 @@ _.extend(OplogObserveDriver.prototype, {
         var bufferedBefore = self._limit && self._unpublishedBuffer.has(id);
 
         if (isReplace) {
-          self._handleDoc(id, _.extend({_id: id}, op.o));
+          self._handleDoc(id, Object.assign({_id: id}, op.o));
         } else if ((publishedBefore || bufferedBefore) &&
                    canDirectlyModifyDoc) {
           // Oh great, we actually know what the document is, so we can apply
@@ -864,11 +878,11 @@ _.extend(OplogObserveDriver.prototype, {
       // the selector, not just the fields we are going to publish (that's the
       // "shared" projection). And we don't want to apply any transform in the
       // cursor, because observeChanges shouldn't use the transform.
-      var options = _.clone(self._cursorDescription.options);
+      var options = Object.assign({}, self._cursorDescription.options);
 
       // Allow the caller to modify the options. Useful to specify different
       // skip and limit values.
-      _.extend(options, optionsOverwrite);
+      Object.assign(options, optionsOverwrite);
 
       options.fields = self._sharedProjection;
       delete options.transform;
@@ -906,7 +920,7 @@ _.extend(OplogObserveDriver.prototype, {
         if (!newResults.has(id))
           idsToRemove.push(id);
       });
-      _.each(idsToRemove, function (id) {
+      idsToRemove.forEach(function (id) {
         self._removePublished(id);
       });
 
@@ -1044,11 +1058,9 @@ OplogObserveDriver.cursorSupported = function (cursorDescription, matcher) {
 };
 
 var modifierCanBeDirectlyApplied = function (modifier) {
-  return _.all(modifier, function (fields, operation) {
-    return _.all(fields, function (value, field) {
+  return Object.entries(modifier).every(function ([operation, fields]) {
+    return Object.entries(fields).every(function ([field, value]) {
       return !/EJSON\$/.test(field);
     });
   });
 };
-
-MongoInternals.OplogObserveDriver = OplogObserveDriver;
