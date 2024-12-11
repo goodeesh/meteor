@@ -24,7 +24,7 @@ const LONG_SOCKET_TIMEOUT = 120 * 1000;
 
 const createExpressApp = () => {
   const app = express();
-  // Security and performace headers
+  // Security and performance headers
   // these headers come from these docs: https://expressjs.com/en/api.html#app.settings.table
   app.set('x-powered-by', false);
   app.set('etag', false);

@@ -140,7 +140,11 @@ const middleware = async (req, res, next) => {
   // Make sure to catch any exceptions because otherwise we'd crash
   // the runner
   try {
-    const serviceName = req.params.service;
+    // Try to use params first
+    let serviceName = req.params?.service;
+    if (!serviceName) {
+      serviceName = oauthServiceName(req);
+    }
     if (!serviceName) {
       // not an oauth request. pass to next middleware.
       next();
@@ -211,6 +215,30 @@ WebApp.handlers.route('/_oauth/:service').all(middleware);
 OAuthTest.middleware = middleware;
 
 OAuthTest.registeredServices = registeredServices;
+
+// Handle /_oauth/* paths and extract the service name.
+//
+// @returns {String|null} e.g. "facebook", or null if this isn't an
+// oauth request
+const oauthServiceName = req => {
+  // req.url will be "/_oauth/<service name>" with an optional "?close".
+  const i = req.url.indexOf('?');
+  let barePath;
+  if (i === -1)
+    barePath = req.url;
+  else
+    barePath = req.url.substring(0, i);
+  const splitPath = barePath.split('/');
+
+  // Any non-oauth request will continue down the default
+  // middlewares.
+  if (splitPath[1] !== '_oauth')
+    return null;
+
+  // Find service based on url
+  const serviceName = splitPath[2];
+  return serviceName;
+};
 
 // Make sure we're configured
 const ensureConfigured =
