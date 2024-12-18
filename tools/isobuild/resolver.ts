@@ -191,9 +191,10 @@ export default class Resolver {
         _seenDirPaths.add(dirPath);
 
         const found = this.getPkgJsonSubsetForDir(dirPath);
-        let matchingExport, foundPkgJsonMain, foundFile = null;
+        let matchingExport, foundPkgJsonMain, foundFile;
+
         if (found && found.exports) {
-          matchingExport = found?.exports && this.resolvePackageExports(packageSubpath, found.exports).find(result => {
+          matchingExport = this.resolvePackageExports(packageSubpath, found.exports).find(result => {
             resolved = this.joinAndStat(dirPath, result.resolved || result.value);
             return resolved && typeof resolved === 'object';
           });
@@ -213,10 +214,6 @@ export default class Resolver {
           });
         } else if (packageSubpath.startsWith('./')) {
           foundFile = resolved = this.joinAndStat(dirPath, packageSubpath);
-        }
-
-        if (foundFile) {
-          continue;
         }
 
         if (found && resolved && (foundPkgJsonMain || matchingExport)) {
@@ -257,6 +254,12 @@ export default class Resolver {
         if (found) {
           packageJsonMap = packageJsonMap || Object.create(null);
           packageJsonMap[found.path] = found.pkg;
+        }
+
+        // Bypass adding `index.js` to the newly resolved path
+        // If it's still a folder, we'll add it next time
+        if (foundFile) {
+          continue
         }
       }
 
