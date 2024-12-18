@@ -147,7 +147,8 @@ export default class Resolver {
       packageName = id;
     } else if (id.startsWith('@')) {
       // everything before second "/"
-      packageName = id.substring(0, id.indexOf('/', id.indexOf('/') + 1));
+      let secondIndex = id.indexOf('/', id.indexOf('/') + 1);
+      packageName = secondIndex === -1 ? id : id.substring(0, secondIndex);
     } else {
       packageName = id.substring(0, id.indexOf('/'));
     }
