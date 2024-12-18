@@ -309,7 +309,7 @@ export default class Resolver {
 
     if (exactResult && exactStat && exactStat.isFile()) {
       result = exactResult;
-    } else {
+    } else if (!path.endsWith('/')) {
       // No point in trying alternate file extensions if the parent
       // directory does not exist.
       const parentDirStat = this.statOrNull(pathDirname(path));
