@@ -378,13 +378,22 @@ export default defineConfig({
             link: "/packages/packages-listing",
             text: "Maintained Packages",
           },
+          {
+            link: "packages/community-packages",
+            text: "Community Packages",
+          },
         ],
         collapsed: true,
       },
       {
         text: "Community Packages",
         link: "/community-packages/index",
-        items: [],
+        items: [
+          {
+            text: "Meteor RPC",
+            link: "/community-packages/meteor-rpc",
+          },
+        ],
         collapsed: true,
       },
       {
@@ -395,6 +404,7 @@ export default defineConfig({
             link: "/troubleshooting/expired-certificate",
           },
           { text: "Windows", link: "/troubleshooting/windows" },
+          { text: "MongoDB Connection", link: "/troubleshooting/mongodb-connection" }
         ],
         collapsed: true,
       },
@@ -436,6 +446,15 @@ export default defineConfig({
           },
         ],
         collapsed: true,
+      },
+      {
+        text: "Performance",
+        items: [
+          {
+            text: "WebSocket Compression",
+            link: "/performance/websocket-compression",
+          },
+        ],
       },
     ],
 
