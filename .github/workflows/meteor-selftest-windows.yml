@@ -27,6 +27,10 @@ jobs:
       cancel-in-progress: true
 
     steps:
+      - name: cleanup
+        shell: powershell
+        run: Remove-Item -Recurse -Force ${{ github.workspace }}\*
+
       - name: Checkout code
         uses: actions/checkout@v4
 
