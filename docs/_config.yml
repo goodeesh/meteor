@@ -1,6 +1,8 @@
 title: Meteor API Docs
 subtitle: API Docs
 versions:
+  - '2.16'
+  - '2.14'
   - '2.13'
   - '2.12'
   - '2.11'
@@ -29,8 +31,8 @@ versioned-netlify-redirects:
   netlify_site_id: meteor-docs
 
 logo:
-  title:
-  subtitle: Docs
+  title: Meteor
+  subtitle: API Docs
 
 sidebar_categories:
   null:
@@ -62,6 +64,7 @@ sidebar_categories:
     - api/packagejs
     - api/mobile-config
     - api/environment
+    - api/top-level-await
   Packages:
     - packages/accounts-ui
     - packages/accounts-passwordless
@@ -85,9 +88,9 @@ sidebar_categories:
     - packages/server-render
     - packages/spacebars
     - packages/standard-minifier-css
-    - packages/underscore
     - packages/url
     - packages/webapp
+    - packages/packages-listing
   Command Line:
     - commandline
     - environment-variables
@@ -389,7 +392,6 @@ redirects:
   /#/full/oauth-encryption: 'packages/oauth-encryption.html'
   /#/full/random: 'packages/random.html'
   /#/full/spiderable: 'packages/spiderable.html'
-  /#/full/underscore: 'packages/underscore.html'
   /#/full/webapp: 'packages/webapp.html'
   '#meteor_isclient': 'api/core.html#Meteor-isClient'
   '#meteor_isserver': 'api/core.html#Meteor-isServer'
@@ -665,6 +667,5 @@ redirects:
   '#oauth-encryption': 'packages/oauth-encryption.html'
   '#random': 'packages/random.html'
   '#spiderable': 'packages/spiderable.html'
-  '#underscore': 'packages/underscore.html'
   '#webapp': 'packages/webapp.html'
   '#pkg_spacebars': 'packages/spacebars.html'

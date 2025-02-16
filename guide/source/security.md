@@ -80,9 +80,9 @@ Meteor.methods({
 
 If someone comes along and passes a non-ID selector like `{}`, they will end up deleting the entire collection.
 
-<h3 id="validated-method">mdg:validated-method</h3>
+<h3 id="jam-method">jam:method</h3>
 
-To help you write good Methods that exhaustively validate their arguments, we've written a wrapper package for Methods that enforces argument validation. Read more about how to use it in the [Methods article](methods.html#validated-method). The rest of the code samples in this article will assume that you are using this package. If you aren't, you can still apply the same principles but the code will look a little different.
+To help you write good Methods that exhaustively validate their arguments, you can use a community package for Methods that enforces argument validation. Read more about how to use it in the [Methods article](methods.html#jam-method). The rest of the code samples in this article will assume that you are using this package. If you aren't, you can still apply the same principles but the code will look a little different.
 
 <h3 id="user-id-client">Don't pass userId from the client</h3>
 
@@ -200,7 +200,8 @@ if (Meteor.isServer) {
 
 This will make every Method only callable 5 times per second per connection. This is a rate limit that shouldn't be noticeable by the user at all, but will prevent a malicious script from totally flooding the server with requests. You will need to tune the limit parameters to match your app's needs.
 
-If you're using validated methods, there's an available [ddp-rate-limiter-mixin](https://github.com/nlhuykhang/ddp-rate-limiter-mixin).
+If you're using `jam:method`, it comes with built in [rate-limiting](https://github.com/jamauro/method#rate-limiting).
+
 
 <h2 id="publications">Publications</h2>
 
@@ -470,7 +471,7 @@ Generally speaking, all production HTTP requests should go over HTTPS, and all W
 It's best to handle the redirection from HTTP to HTTPS on the platform which handles the SSL certificates and termination.
 
 * On [Galaxy](deployment.html#galaxy), enable the "Force HTTPS" setting on a specific domain in the "Domains & Encryption" section of the application's "Settings" tab.
-* Other deployments *may* have control panel options or may need to be manually configured on the the proxy server (e.g. HAProxy, nginx, etc.). The articles linked above provide some assistance on this.
+* Other deployments *may* have control panel options or may need to be manually configured on the proxy server (e.g. HAProxy, nginx, etc.). The articles linked above provide some assistance on this.
 
 In the event that a platform does not offer the ability to configure this, the `force-ssl` package can be added to the project and Meteor will attempt to intelligently redirect based on the presence of the `x-forwarded-for` header.
 
@@ -497,7 +498,7 @@ By default, Helmet can be used to set various HTTP headers (see link above). The
 import helmet from "helmet";
 
 // Within server side Meter.startup()
-WebApp.connectHandlers.use(helmet())
+WebApp.handlers.use(helmet())
 ```
 
 At a minimum, Meteor recommends users to set the following headers. Note that code examples shown below are specific to Helmet.
@@ -517,7 +518,7 @@ By default, Meteor recommends unsafe inline scripts and styles are allowed, sinc
 import helmet from "helmet";
 
 // Within server side Meter.startup()
-WebApp.connectHandlers.use(
+WebApp.handlers.use(
   helmet.contentSecurityPolicy({
     directives: {
       defaultSrc: ["'self'"],
@@ -696,7 +697,7 @@ With Helmet, Frameguard sets the X-Frame-Options header.
 import helmet from "helmet";
 
 // Within server side Meter.startup()
-WebApp.connectHandlers.use(helmet.frameguard());  // defaults to sameorigin
+WebApp.handlers.use(helmet.frameguard());  // defaults to sameorigin
 ```
 For more detail please read the following guide: [Frameguard](https://helmetjs.github.io/docs/frameguard/).
 

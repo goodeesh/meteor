@@ -12,6 +12,11 @@ Tinytest.add('modern-browsers - versions - basic', function (test) {
     major: 60,
   }));
 
+  test.isTrue(isModern({
+    name: "edgeMobile",
+    major: 120,
+  }));
+
   test.isFalse(isModern({
     name: "firefox",
     major: 25,
@@ -29,4 +34,36 @@ Tinytest.add('modern-browsers - versions - basic', function (test) {
     minor: 5,
     patch: 2,
   }));
+
+  test.isTrue(isModern({
+    name: "appleMail", 
+    major: 605, 
+    minor: 1,
+    patch: 15,
+  }));
+
+  test.isFalse(isModern({
+    name: "unknownBrowser", 
+    major: 10, 
+    minor: 1,
+    patch: 0,
+  }));
+
+  const oldPackageSettings = Meteor.settings.packages;
+  
+  Meteor.settings.packages = {
+    "modern-browsers": {
+       "unknownBrowsersAssumedModern": true
+    }
+  };
+
+  test.isTrue(isModern({
+    name: "unknownBrowser", 
+    major: 10, 
+    minor: 1,
+    patch: 0,
+  }));
+
+
+  Meteor.settings.packages = oldPackageSettings;
 });
