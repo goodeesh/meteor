@@ -2,7 +2,6 @@ name: Check legacy syntax
 permissions:
   contents: read
 on:
-  - push
   - pull_request
 jobs:
   check-code-style:
