@@ -2010,10 +2010,10 @@ const setsEqual = function (a, b) {
         );
 
         coll.allow({
-          updateAsync: function() {
+          update: function() {
             return true;
           },
-          removeAsync: function() {
+          remove: function() {
             return true;
           },
         });
@@ -4388,9 +4388,6 @@ testAsyncMulti(
         `methodop_persistence${test.runId()}`,
       );
       Collection.allow({
-        insertAsync() {
-          return true;
-        },
         insert() {
           return true;
         },
