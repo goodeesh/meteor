@@ -1,3 +1,6 @@
+import { RoutePolicy } from 'meteor/routepolicy';
+import { WebApp } from 'meteor/webapp';
+
 OAuth = {};
 OAuthTest = {};
 
@@ -134,6 +137,31 @@ OAuth._checkRedirectUrlOrigin = redirectUrl => {
   );
 };
 
+// Handle /_oauth/* paths and extract the service name.
+//
+// @returns {String|null} e.g. "facebook", or null if this isn't an
+// oauth request
+const oauthServiceName = req => {
+  // req.url will be "/_oauth/<service name>" with an optional "?close".
+  const i = req.url.indexOf('?');
+  let barePath;
+  if (i === -1) {
+    barePath = req.url;
+  } else {
+    barePath = req.url.substring(0, i);
+  }
+  const splitPath = barePath.split('/');
+
+  // Any non-oauth request will continue down the default
+  // middlewares.
+  if (splitPath[1] !== '_oauth')
+    return null;
+
+  // Find service based on url
+  const serviceName = splitPath[2];
+  return serviceName;
+};
+
 const middleware = async (req, res, next) => {
   let requestData;
 
@@ -154,8 +182,9 @@ const middleware = async (req, res, next) => {
     const service = registeredServices[serviceName];
 
     // Skip everything if there's no service set by the oauth middleware
-    if (!service)
+    if (!service) {
       throw new Error(`Unexpected OAuth service ${serviceName}`);
+    }
 
     // Make sure we're configured
     await ensureConfigured(serviceName);
@@ -179,7 +208,8 @@ const middleware = async (req, res, next) => {
     // we were passed. But then the developer wouldn't be able to
     // style the error or react to it in any way.
     if (requestData?.state && err instanceof Error) {
-      try { // catch any exceptions to avoid crashing runner
+      try {
+        // catch any exceptions to avoid crashing runner
         await OAuth._storePendingCredential(OAuth._credentialTokenFromQuery(requestData), err);
       } catch (err) {
         // Ignore the error and just give up. If we failed to store the
@@ -207,38 +237,15 @@ const middleware = async (req, res, next) => {
 };
 
 // Listen to incoming OAuth http requests
-WebApp.handlers.use('/_oauth', WebApp.express.json());
-WebApp.handlers.use('/_oauth', WebApp.express.urlencoded({ extended: false }));
-// WebApp.handlers.use('/_oauth', WebApp.express.json(), WebApp.express.urlencoded({ extended: false }));
-WebApp.handlers.route('/_oauth/:service').all(middleware);
+const OAuthRouter = WebApp.express.Router();
+OAuthRouter.use(WebApp.express.json());
+OAuthRouter.use(WebApp.express.urlencoded({ extended: false }));
+OAuthRouter.route('/:service').all(middleware);
+WebApp.handlers.use('/_oauth', OAuthRouter);
 
 OAuthTest.middleware = middleware;
 
 OAuthTest.registeredServices = registeredServices;
-
-// Handle /_oauth/* paths and extract the service name.
-//
-// @returns {String|null} e.g. "facebook", or null if this isn't an
-// oauth request
-const oauthServiceName = req => {
-  // req.url will be "/_oauth/<service name>" with an optional "?close".
-  const i = req.url.indexOf('?');
-  let barePath;
-  if (i === -1)
-    barePath = req.url;
-  else
-    barePath = req.url.substring(0, i);
-  const splitPath = barePath.split('/');
-
-  // Any non-oauth request will continue down the default
-  // middlewares.
-  if (splitPath[1] !== '_oauth')
-    return null;
-
-  // Find service based on url
-  const serviceName = splitPath[2];
-  return serviceName;
-};
 
 // Make sure we're configured
 const ensureConfigured =

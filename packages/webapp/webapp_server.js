@@ -18,6 +18,7 @@ import cluster from 'node:cluster';
 import { execSync } from 'node:child_process';
 import { URL } from 'node:url';
 import qs from 'qs';
+import { RoutePolicy } from 'meteor/routepolicy';
 
 const SHORT_SOCKET_TIMEOUT = 5 * 1000;
 const LONG_SOCKET_TIMEOUT = 120 * 1000;
@@ -36,9 +37,8 @@ export const WebAppInternals = {};
 
 const hasOwn = Object.prototype.hasOwnProperty;
 
-
 WebAppInternals.NpmModules = {
-  express : {
+  express: {
     version: Npm.require('express/package.json').version,
     module: express,
   }
@@ -1058,14 +1058,15 @@ async function runWebAppServer() {
   await WebAppInternals.reloadClientPrograms();
 
   // webserver
-  var app = createExpressApp();
+  const app = createExpressApp();
 
   // Packages and apps can add handlers that run before any other Meteor
   // handlers via WebApp.rawExpressHandlers.
-  var rawExpressHandlers = createExpressApp();
+  const rawExpressHandlers = createExpressApp();
   app.use(rawExpressHandlers);
 
   // Auto-compress any json, javascript, or text.
+  // TODO We should consider adding configuration options for people to adjust compression options
   app.use(compress({ filter: shouldCompress }));
 
   // parse cookies into an object
@@ -1183,7 +1184,7 @@ async function runWebAppServer() {
    */
   // Packages and apps can add handlers to this via WebApp.expressHandlers.
   // They are inserted before our default handler.
-  var packageAndAppHandlers = createExpressApp()
+  var packageAndAppHandlers = createExpressApp();
   app.use(packageAndAppHandlers);
 
   let suppressExpressErrors = false;
