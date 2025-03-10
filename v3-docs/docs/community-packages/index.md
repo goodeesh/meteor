@@ -27,3 +27,8 @@ Please bear in mind if you are adding a package to this list, try providing as m
 #### Method/Subscription helpers
 
 - [`meteor-rpc`](./meteor-rpc.md), Meteor Methods Evolved with type checking and runtime validation
+- [`jam:method`](./jam-method.md), An easy way to create Meteor methods with extensions to offline handling
+
+#### Utilities
+
+- [`jam:offline`](./offline.md), An easy way to give your Meteor app offline capabilities and make it feel instant
