@@ -6,7 +6,7 @@
 
 ## What is this package?
 
-Method is an easy way to create Meteor methods with Optimistic UI. It's built with Meteor 3.0 in mind and is compatible with Meteor 2.x to make migration easy. It's meant to be a drop in replacement for Validated Method and comes with additional features:
+Method is an easy way to create Meteor methods with Optimistic UI. It's built with Meteor 3 in mind and is compatible with Meteor 2 to make migration easy. It's meant to be a drop in replacement for Validated Method and comes with additional features:
 
 * Before and after hooks
 * Global before and after hooks for all methods
