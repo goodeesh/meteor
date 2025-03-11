@@ -1,7 +1,5 @@
 # Archive
 
-# Soft-delete
-
 - `Who maintains the package` – [Jam](https://github.com/jamauro)
 
 [[toc]]
