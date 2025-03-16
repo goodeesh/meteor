@@ -20,6 +20,10 @@ Add the package to your app
 meteor add jam:offline
 ```
 
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/offline)
+
 ## How to use it?
 
 ### Keeping data offline

@@ -26,6 +26,9 @@ Add the package to your app
 ```bash
 meteor add jam:soft-delete
 ```
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/soft-delete)
 
 ## How to use it?
 
