@@ -13,6 +13,10 @@ This package adds the basic functionality to manage your legal documents and mak
 meteor add freedombase:legal-management
 ```
 
+### Sources
+
+* [GitHub repository](https://github.com/Freedombase/meteor-legal-management)
+
 ## How to use it?
 
 This package has two parts. First is the management of legal documents. Second is the management of user (or other entities) consent to these documents.
