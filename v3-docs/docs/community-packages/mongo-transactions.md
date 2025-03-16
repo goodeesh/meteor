@@ -23,6 +23,9 @@ Add the package to your app
 ```bash
 meteor add jam:mongo-transactions
 ```
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/mongo-transactions)
 
 ## How to use it?
 

@@ -25,6 +25,9 @@ Add the package to your app by running the following in your Meteor project:
 ```bash
 meteor add jam:method
 ```
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/method)
 
 ## How to use it?
 

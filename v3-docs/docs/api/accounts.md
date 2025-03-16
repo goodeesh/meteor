@@ -19,7 +19,7 @@ Read more about customizing user accounts in the [Accounts](http://guide.meteor.
 
 ### Accounts with Session Storage {#accounts-session-storage}
 
-By default, Meteor uses Local Storage to store, among other things, login tokens in your browser session. But, for some applications, it makes sense to use Session Storage instead. You can achieve this by adding this to your settings:
+By default, Meteor uses Local Storage to store, among other things, login tokens in your browser session. But, for some applications, it makes sense to use Session Storage instead. Session Storage will not persist across client sessions. You can achieve this by adding this to your settings:
 
 ```json
 {

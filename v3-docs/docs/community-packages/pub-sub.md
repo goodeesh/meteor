@@ -27,6 +27,9 @@ Add the package to your app
 ```bash
 meteor add jam:pub-sub
 ```
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/pub-sub)
 
 ## How to use it?
 

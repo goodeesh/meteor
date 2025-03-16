@@ -25,6 +25,10 @@ Add the package to your app
 meteor add jam:archive
 ```
 
+### Sources
+
+* [GitHub repository](https://github.com/jamauro/archive)
+
 ## How to use it?
 
 ### Create your Archives collection
