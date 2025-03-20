@@ -413,7 +413,7 @@ function startInspectorProfiling(name: string): boolean {
     
     // Adjust the heap limit to avoid OOM
     if (process.env.NODE_OPTIONS && !process.env.NODE_OPTIONS.includes('--max-old-space-size')) {
-      process.stdout.write('[PROFILING_START] WARN: Recommended to set NODE_OPTIONS="--max-old-space-size=4096" to avoid OOM\n');
+      process.stdout.write('[PROFILING_START] WARN: Recommended to set TOOL_NODE_FLAGS="–max_old_space_size=4096" to avoid OOM\n');
     }
     
     profileStartTime = Date.now();
