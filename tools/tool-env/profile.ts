@@ -215,7 +215,6 @@ const INSPECTOR_CONFIG: InspectorConfigType = {
   outputDir: process.env.METEOR_INSPECT_OUTPUT || path.join(process.cwd(), 'profiling'),
   // Interval in ms (smaller = more details, but more memory)
   samplingInterval: process.env.METEOR_INSPECT_INTERVAL ? parseInt(process.env.METEOR_INSPECT_INTERVAL || '1000', 10) : undefined,
-  // Maximum profile size in MB
   maxProfileSize: parseInt(process.env.METEOR_INSPECT_MAX_SIZE || '2000', 10)
 };
 
@@ -324,26 +323,23 @@ export function Profile<
       profileInfo.isActive = startInspectorProfiling(name);
       
       if (profileInfo.isActive) {
-        // Monitor for process exit to stop profiling correctly
-        process.on('exit', () => {
+        const handleTermination = (context: string) => {
           if (profileInfo.isActive && !profileInfo.isCompleted) {
-            stopInspectorProfiling(name, true).catch(err => {
-              process.stdout.write(`[PROFILING_EXIT] Error stopping profiling: ${err}\n`);
+            return stopInspectorProfiling(name, true).catch(err => {
+              process.stdout.write(`[PROFILING_${context}] Error stopping profiling: ${err}\n`);
             });
           }
-        });
-        
-        // Monitor for signals to stop profiling correctly
+          return Promise.resolve();
+        };
+
+        process.on('exit', () => { handleTermination('EXIT'); });
+
         const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
         signals.forEach(signal => {
           process.once(signal, () => {
-            if (profileInfo.isActive && !profileInfo.isCompleted) {
-              stopInspectorProfiling(name, true).catch(err => {
-                process.stdout.write(`[PROFILING_SIGNAL] Error stopping profiling: ${err}`);
-              }).finally(() => {
-                process.exit(130);
-              });
-            }
+            handleTermination('SIGNAL').finally(() => {
+              process.exit(130);
+            });
           });
         });
       }
@@ -359,16 +355,19 @@ export function Profile<
       return Promise.resolve();
     };
 
+    function completeIfSync(result:  TResult | Promise<TResult>){
+      if (!(result instanceof Promise)) {
+        completeProfiler();
+      }
+    }
+
     try {
       if (!asyncLocalStorage.getStore()) {
         const result = asyncLocalStorage.run(store, () => 
           runWithContext(name, store, f, this, args, completeProfiler));
           
         // For sync results, complete profiling here
-        if (!(result instanceof Promise)) {
-          completeProfiler();
-        }
-        
+        completeIfSync(result)
         return result;
       }
 
@@ -376,10 +375,7 @@ export function Profile<
       const result = runWithContext(name, store, f, this, args, completeProfiler);
       
       // For sync results, complete profiling here
-      if (!(result instanceof Promise)) {
-        completeProfiler();
-      }
-      
+      completeIfSync(result)
       return result;
     } catch (error) {
       completeProfiler();
@@ -409,11 +405,6 @@ function startInspectorProfiling(name: string): boolean {
   try {
     if (rootSession) {
       return false;
-    }
-    
-    // Adjust the heap limit to avoid OOM
-    if (process.env.NODE_OPTIONS && !process.env.NODE_OPTIONS.includes('--max-old-space-size')) {
-      process.stdout.write('[PROFILING_START] WARN: Recommended to set TOOL_NODE_FLAGS="–max_old_space_size=4096" to avoid OOM\n');
     }
     
     profileStartTime = Date.now();
@@ -580,10 +571,6 @@ function saveProfile(profile: any, name: string, filename: string, duration: num
   process.stdout.write(`[PROFILING_SAVE] Duration: ${duration}ms, size: ${profileSize.toFixed(2)}MB`);
 }
 
-// ================================
-
-
-// Fixing type issues in the runWithContext function
 function runWithContext<TArgs extends any[], TResult>(
     bucketName: string | ((...args: TArgs) => string),
     store: { currentEntry: string[]; [key: string]: any },
