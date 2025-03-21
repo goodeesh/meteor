@@ -17,15 +17,8 @@ export interface BabelifyOptions {
 /**
  * Parse a JavaScript/TypeScript source and transform it into a Babel-compatible AST.
  *
- * This function exposes the same pipeline as in your bench test. It creates a new SWC compiler,
- * parses the source using the provided options, and then runs the Babelify conversion.
- *
- * # Parameters
- * - `source`: The source code to parse.
- * - `options`: An optional object to override default parameters (file name, syntax, module mode, and ECMAScript version).
- *
- * # Returns
- * A JSON string representing the Babelified AST.
+ * This function creates a new SWC compiler, parses the source using the provided options,
+ * and then converts it to a Babel AST with minimal overhead.
  *
  * # Example (in JavaScript)
  * ```js

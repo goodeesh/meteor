@@ -3,7 +3,6 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use std::sync::Arc;
-use std::io::stderr;
 use std::panic::AssertUnwindSafe;
 
 use napi::bindgen_prelude::*;
@@ -18,9 +17,10 @@ use swc_common::{
     SourceMap,
     GLOBALS,
 };
-use swc_ecma_ast::{EsVersion};
+use swc_ecma_ast::EsVersion;
 use swc_ecma_parser::Syntax;
 use swc_estree_compat::babelify::{Babelify, Context};
+use swc_node_comments::SwcComments;
 
 /// Options to control the parsing and babelify process.
 #[napi(object)]
@@ -38,15 +38,8 @@ pub struct BabelifyOptions {
 
 /// Parse a JavaScript/TypeScript source and transform it into a Babel-compatible AST.
 ///
-/// This function exposes the same pipeline as in your bench test. It creates a new SWC compiler,
-/// parses the source using the provided options, and then runs the Babelify conversion.
-///
-/// # Parameters
-/// - `source`: The source code to parse.
-/// - `options`: An optional object to override default parameters (file name, syntax, module mode, and ECMAScript version).
-///
-/// # Returns
-/// A JSON string representing the Babelified AST.
+/// This function creates a new SWC compiler, parses the source using the provided options,
+/// and then converts it to a Babel AST with minimal overhead.
 ///
 /// # Example (in JavaScript)
 /// ```js
@@ -60,7 +53,7 @@ pub struct BabelifyOptions {
 pub fn parse_and_babelify(source: String, options: Option<BabelifyOptions>) -> Result<serde_json::Value> {
     // Apply defaults if options are not provided.
     let opts = options.unwrap_or_default();
-    let file_name = opts.file_name.unwrap_or_else(|| "input.js".to_string());
+    let file_name = opts.file_name.unwrap_or_else(|| "input.js".into());
     let syntax = match opts.syntax.as_deref() {
         Some("ecmascript") => Syntax::Es(Default::default()),
         _ => Syntax::Typescript(Default::default()),
@@ -84,43 +77,36 @@ pub fn parse_and_babelify(source: String, options: Option<BabelifyOptions>) -> R
         let compiler = Compiler::new(cm.clone());
 
         // Create a new source file from the input.
-        let fm = cm.new_source_file(
-            FileName::Real(file_name.into()).into(),
-            source,
-        );
+        let fm = cm.new_source_file(FileName::Real(file_name.into()).into(), source);
 
-        // Create an error handler and get the comments.
-        let handler = Handler::with_emitter_writer(Box::new(stderr()), Some(cm.clone()));
-        let comments = compiler.comments().clone();
+        // Create an empty comments collector using SwcComments's default implementation.
+        let comments = SwcComments::default();
 
-        // Parse the source code into an SWC AST.
-        let program = compiler.parse_js(
-            fm.clone(),
-            &handler,
-            es_version,
-            syntax,
-            swc::config::IsModule::Bool(is_module),
-            Some(&comments),
-        )
-        .map_err(|err| Error::from_reason(format!("Parse error: {:?}", err)))?;
+        // Create an error handler that discards error output.
+        let handler = Handler::with_emitter_writer(Box::new(std::io::sink()), Some(cm.clone()));
 
-        // In your bench test you sometimes applied additional transforms (resolver, typescript stripping, es2020)
-        // before babelifying. Here you can add those transforms if desired. For simplicity, we use the parsed program directly.
+        // Parse the source code into an SWC AST without collecting comments.
+        let program = compiler
+            .parse_js(
+                fm.clone(),
+                &handler,
+                es_version,
+                syntax,
+                swc::config::IsModule::Bool(is_module),
+                None, // Do not collect comments during parsing
+            )
+            .map_err(|err| Error::from_reason(format!("Parse error: {:?}", err)))?;
+
+        // Set up the context for Babel conversion.
         let ctx = Context {
             fm: fm.clone(),
             cm: cm.clone(),
-            comments: comments.clone(),
+            comments,
         };
 
-        let babel_ast_result = std::panic::catch_unwind(AssertUnwindSafe(|| program.babelify(&ctx)));
-        let babel_ast = match babel_ast_result {
-            Ok(ast) => ast,
-            Err(_) => {
-                return Err(napi::Error::from_reason(
-                    "Conversion failed due to unsupported optional chaining.",
-                ))
-            }
-        };
+        // Convert the parsed program into a Babel-compatible AST.
+        let babel_ast = std::panic::catch_unwind(AssertUnwindSafe(|| program.babelify(&ctx)))
+            .map_err(|_| Error::from_reason("Conversion failed due to unsupported optional chaining."))?;
 
         // Serialize the resulting AST to JSON.
         serde_json::to_value(&babel_ast)
