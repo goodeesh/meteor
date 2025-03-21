@@ -1,0 +1,15 @@
+{
+  "name": "parseSwcBabelify-darwin-universal",
+  "version": "0.0.0",
+  "os": [
+    "darwin"
+  ],
+  "main": "parseSwcBabelify.darwin-universal.node",
+  "files": [
+    "parseSwcBabelify.darwin-universal.node"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">= 10"
+  }
+}

@@ -985,6 +985,7 @@ export default class ImportScanner {
     const result = findImportedModuleIdentifiers(
       await this.getDataString(file),
         fileHash,
+        file.sourcePath,
     );
 
     // there should always be file.hash, but better safe than sorry

@@ -620,7 +620,7 @@ Object.assign(File.prototype, {
     }
 
     try {
-      return Object.keys(findAssignedGlobals(self.source, self._inputHash));
+      return Object.keys(findAssignedGlobals(self.source, self._inputHash, self.sourcePath));
     } catch (e) {
       if (!e.$ParseError) {
         throw e;

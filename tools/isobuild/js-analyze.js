@@ -4,6 +4,7 @@ import LRUCache from "lru-cache";
 import { Profile } from '../tool-env/profile';
 import Visitor from "@meteorjs/reify/lib/visitor.js";
 import { findPossibleIndexes } from "@meteorjs/reify/lib/utils.js";
+import path from 'path';
 
 const hasOwn = Object.prototype.hasOwnProperty;
 const objToStr = Object.prototype.toString
@@ -15,12 +16,12 @@ function isRegExp(value) {
 var AST_CACHE = new LRUCache({
   max: Math.pow(2, 12),
   length(ast) {
-    return ast.loc.end.line;
+    return ast.numLines;
   }
 });
 
 // Like babel.parse, but annotates any thrown error with $ParseError = true.
-function tryToParse(source, hash) {
+function tryToParse(source, hash, filePath) {
   if (hash && AST_CACHE.has(hash)) {
     return AST_CACHE.get(hash);
   }
@@ -28,20 +29,51 @@ function tryToParse(source, hash) {
   let ast;
   try {
     Profile.time('jsAnalyze.parse', () => {
-      ast = parse(source, {
-        strictMode: false,
-        sourceType: 'module',
-        allowImportExportEverywhere: true,
-        allowReturnOutsideFunction: true,
-        allowUndeclaredExports: true,
-        plugins: [
-          // Only plugins for stage 3 features are enabled
-          // Enabling some plugins significantly affects parser performance
-          'importAttributes',
-          'explicitResourceManagement',
-          'decorators'
-        ]
-      });
+      try {
+        const shouldUseSwc = true;
+        if (shouldUseSwc) {
+          const isTypescriptSyntax =
+            filePath.endsWith('.ts') || filePath.endsWith('.tsx');
+          ast = require('../rs/parseSwcBabelify/parseSwcBabelify.linux-x64-gnu.node').parseAndBabelify(source, {
+            file_name: path.basename(filePath),
+            es_version: 'es2015',
+            syntax: isTypescriptSyntax  ? "typescript" : "ecmascript",
+            is_module: true,
+          });
+          ast = Object.assign(ast, { numLines: source.split('\n').length });
+        } else {
+          ast = parse(source, {
+            strictMode: false,
+            sourceType: 'module',
+            allowImportExportEverywhere: true,
+            allowReturnOutsideFunction: true,
+            allowUndeclaredExports: true,
+            plugins: [
+              // Only plugins for stage 3 features are enabled
+              // Enabling some plugins significantly affects parser performance
+              'importAttributes',
+              'explicitResourceManagement',
+              'decorators'
+            ]
+          });
+        }
+      } catch (e) {
+        console.log('e', e);
+        ast = parse(source, {
+          strictMode: false,
+          sourceType: 'module',
+          allowImportExportEverywhere: true,
+          allowReturnOutsideFunction: true,
+          allowUndeclaredExports: true,
+          plugins: [
+            // Only plugins for stage 3 features are enabled
+            // Enabling some plugins significantly affects parser performance
+            'importAttributes',
+            'explicitResourceManagement',
+            'decorators'
+          ]
+        });
+      }
     });
   } catch (e) {
     if (typeof e.loc === 'object') {
@@ -71,7 +103,7 @@ function tryToParse(source, hash) {
  * if the tokens were actually what we thought they were (a `require`
  * function call, or an `import` or `export` statement).
  */
-export function findImportedModuleIdentifiers(source, hash) {
+export function findImportedModuleIdentifiers(source, hash, filePath) {
   const possibleIndexes = findPossibleIndexes(source, [
     "require",
     "import",
@@ -84,7 +116,7 @@ export function findImportedModuleIdentifiers(source, hash) {
     return {};
   }
 
-  const ast = tryToParse(source, hash);
+  const ast = tryToParse(source, hash, filePath);
   Profile.time('findImportedModuleIdentifiersVisitor', () => {
     importedIdentifierVisitor.visit(ast, source, possibleIndexes);
   });
@@ -268,12 +300,12 @@ const globalsCache = new LRUCache({
   }
 });
 
-export function findAssignedGlobals(source, hash) {
+export function findAssignedGlobals(source, hash, filePath) {
   if (hash && globalsCache.has(hash)) {
     return globalsCache.get(hash);
   }
 
-  const ast = tryToParse(source, hash);
+  const ast = tryToParse(source, hash, filePath);
 
   // We have to pass ignoreEval; otherwise, the existence of a direct eval call
   // causes escope to not bother to resolve references in the eval's scope.
