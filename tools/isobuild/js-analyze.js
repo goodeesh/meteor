@@ -8,6 +8,7 @@ import path from 'path';
 
 const hasOwn = Object.prototype.hasOwnProperty;
 const objToStr = Object.prototype.toString
+const parseSwcBabelify = require('../rs/parseSwcBabelify/parseSwcBabelify.linux-x64-gnu.node');
 
 function isRegExp(value) {
   return value && objToStr.call(value) === "[object RegExp]";
@@ -16,7 +17,7 @@ function isRegExp(value) {
 var AST_CACHE = new LRUCache({
   max: Math.pow(2, 12),
   length(ast) {
-    return ast.numLines;
+    return ast.loc.end.line;
   }
 });
 
@@ -34,13 +35,12 @@ function tryToParse(source, hash, filePath) {
         if (shouldUseSwc) {
           const isTypescriptSyntax =
             filePath.endsWith('.ts') || filePath.endsWith('.tsx');
-          ast = require('../rs/parseSwcBabelify/parseSwcBabelify.linux-x64-gnu.node').parseAndBabelify(source, {
+          ast = parseSwcBabelify.parseAndBabelify(source, {
             file_name: path.basename(filePath),
             es_version: 'es2015',
             syntax: isTypescriptSyntax  ? "typescript" : "ecmascript",
             is_module: true,
           });
-          ast = Object.assign(ast, { numLines: source.split('\n').length });
         } else {
           ast = parse(source, {
             strictMode: false,
