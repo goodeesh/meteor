@@ -171,7 +171,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
                   tsx: hasTSXSupport,
                 },
               },
-              module: { type: 'commonjs' },
+              module: { type: 'es6' },
               minify: false,
               sourceMaps: true,
             });
