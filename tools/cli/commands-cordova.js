@@ -12,7 +12,7 @@ import {
 import {PlatformList} from "../project-context";
 
 async function createProjectContext(appDir) {
-  import { ProjectContext } from '../project-context.js';
+  const { ProjectContext } = require('../project-context.js');
 
   const projectContext = new ProjectContext({
     projectDir: appDir
@@ -25,7 +25,7 @@ async function createProjectContext(appDir) {
 }
 
 async function doAddPlatform(options) {
-  import { CordovaProject } from '../cordova/project.js';
+  const { CordovaProject } = require('../cordova/project.js');
 
   Console.setVerbose(!!options.verbose);
 
@@ -73,8 +73,8 @@ async function doAddPlatform(options) {
 }
 
 async function doRemovePlatform(options) {
-  import { CordovaProject } from '../cordova/project.js';
-  import { PlatformList } from '../project-context.js';
+  const { CordovaProject } = require('../cordova/project.js');
+  const { PlatformList } = require('../project-context.js');
 
   const projectContext = await createProjectContext(options.appDir);
 

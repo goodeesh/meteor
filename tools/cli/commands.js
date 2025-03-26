@@ -516,7 +516,7 @@ async function doRunCommand(options) {
   if (!_.isEmpty(runTargets)) {
 
     async function prepareCordovaProject() {
-      import { CordovaProject } from '../cordova/project.js';
+      const { CordovaProject } = require('../cordova/project.js');
 
       await main.captureAndExit('', 'preparing Cordova project', async () => {
         // TODO -> Have to change CordovaProject constructor here.
@@ -1478,15 +1478,16 @@ ${Console.command("meteor build ../output")}`,
     let cordovaProject;
     await main.captureAndExit('', async () => {
 
-      import {
+      const {
         pluginVersionsFromStarManifest,
         displayNameForPlatform,
-      } from '../cordova/index.js';
+      } = require('../cordova/index.js');
 
       await ensureDevBundleDependencies();
 
       await buildmessage.enterJob({ title: "preparing Cordova project" }, async() => {
-        import { CordovaProject } from '../cordova/project.js';
+
+        const { CordovaProject } = require('../cordova/project.js');
 
         cordovaProject = new CordovaProject(projectContext, {
           settingsFile: options.settings,
@@ -2367,7 +2368,7 @@ async function doTestCommand(options) {
   if (!_.isEmpty(runTargets)) {
     function prepareCordovaProject() {
       return main.captureAndExit('', 'preparing Cordova project', async () => {
-        import { CordovaProject } from '../cordova/project.js';
+        const { CordovaProject } = require('../cordova/project.js');
 
         const cordovaProject = new CordovaProject(projectContext, {
           settingsFile: options.settings,

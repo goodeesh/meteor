@@ -149,7 +149,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
         let compilation;
         try {
           const packagesSkipSwc = [];
-          const fileSkipSwc = ['webapp_server.js']; // top level await
+          const fileSkipSwc = []; // top level await
 
           // Determine if SWC should be used based on package and file criteria.
           const shouldUseSwc =
@@ -164,7 +164,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
 
             const transformed = SWC.transformSync(source, {
               jsc: {
-                target: 'es2015',
+                target: 'es2022',
                 parser: {
                   syntax: isTypescriptSyntax ? 'typescript' : 'ecmascript',
                   jsx: hasJSXSupport,

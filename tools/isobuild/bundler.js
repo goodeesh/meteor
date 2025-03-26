@@ -1888,7 +1888,6 @@ class ClientTarget extends Target {
     };
 
     if (this.arch === 'web.cordova') {
-      import { CORDOVA_PLATFORM_VERSIONS } from '../cordova';
       const { WebAppHashing } = await loadIsopackage('webapp-hashing');
 
       const cordovaCompatibilityVersions =

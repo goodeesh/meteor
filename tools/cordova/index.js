@@ -110,7 +110,7 @@ export function pluginVersionsFromStarManifest(star) {
 }
 
 export function newPluginId(id) {
-  import { oldToNew as oldToNewPluginIds } from 'cordova-registry-mapper';
+  const { oldToNew: oldToNewPluginIds } = require('cordova-registry-mapper');
   return oldToNewPluginIds[id];
 }
 

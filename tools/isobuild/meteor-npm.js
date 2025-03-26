@@ -894,8 +894,7 @@ const npmUserConfigFile = files.pathJoin(
 
 var runNpmCommand = meteorNpm.runNpmCommand =
 Profile("meteorNpm.runNpmCommand", async function (args, cwd) {
-  import { getEnv } from "../cli/dev-bundle-bin-helpers.js";
-
+  const { getEnv } = require("../cli/dev-bundle-bin-helpers.js");
   const devBundleDir = files.getDevBundle();
   const isWindows = process.platform === "win32";
   const npmPath = files.convertToOSPath(files.pathJoin(

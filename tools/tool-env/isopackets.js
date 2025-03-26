@@ -105,10 +105,12 @@ export async function loadIsopackage(packageName, isopacketName = "combined") {
       if (loadedIsopackets[isopacketName]) {
         return loadedIsopackets[isopacketName];
       }
+      console.log("=>(isopackets.js:97) isopacketName", packageName, isopacketName);
 
       // This is the case where the isopacket is up to date on disk but not
       // loaded.
       const loaded = await loadIsopacketFromDisk(isopacketName);
+      console.log("=>(isopackets.js:113) loaded", loaded);
       loadedIsopackets[isopacketName] = loaded;
 
       return loaded;
@@ -326,6 +328,7 @@ var loadIsopacketFromDisk = async function (isopacketName) {
 
   // This is a build step ... but it's one that only happens in development, so
   // it can just crash the app instead of being handled nicely.
+  console.log("=>(isopackets.js:333) messages", messages);
   if (messages.hasMessages()) {
     Console.error("Errors prevented isopacket load:");
     Console.printMessages(messages);

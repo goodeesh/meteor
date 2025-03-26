@@ -1655,8 +1655,7 @@ Object.assign(exports.ReleaseFile.prototype, {
 
   // Make a symlink from .meteor/local/dev_bundle to the actual dev_bundle.
   async ensureDevBundleLink() {
-    import { makeLink, readLink } from "./cli/dev-bundle-links.js";
-
+    const { makeLink, readLink } = require("./cli/dev-bundle-links.js");
     const dotMeteorDir = files.pathDirname(this.filename);
     const localDir = files.pathJoin(dotMeteorDir, "local");
     const devBundleLink = files.pathJoin(localDir, "dev_bundle");
