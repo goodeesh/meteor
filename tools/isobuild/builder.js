@@ -126,7 +126,21 @@ Previous builder: ${previousBuilder.outputPath}, this builder: ${outputPath}`
   async init() {
     // Build the output from scratch
     if (this.resetBuildPath) {
-      await files.rm_recursive(this.buildPath);
+      // Generate a temp path name for the old build directory
+      const oldBuildPath = this.buildPath + '.old-' + Math.floor(Math.random() * 999999);
+      
+      // If the original buildPath exists, rename it first
+      if (files.exists(this.buildPath)) {
+        await files.rename(this.buildPath, oldBuildPath);
+        
+        // Start deletion of old directory asynchronously without awaiting
+        files.rm_recursive(oldBuildPath).catch(e => {
+          // Log error but don't fail the build
+          console.error(`Error removing old build directory ${oldBuildPath}:`, e);
+        });
+      }
+      
+      // Create the new build directory immediately without waiting for deletion
       await files.mkdir_p(this.buildPath, 0o755);
     }
     this.watchSet = new WatchSet();
