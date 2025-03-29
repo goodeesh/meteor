@@ -970,7 +970,7 @@ class Target {
       // Phase 2.
       const usedUnibuilds = {};  // Map from unibuild.id to Unibuild.
       this.usedPackages = {};  // Map from package name to true;
-      const addToGetsUsed = async function (unibuild) {
+      const addToGetsUsed = function (unibuild) {
         if (_.has(usedUnibuilds, unibuild.id)) {
           return;
         }
@@ -979,7 +979,7 @@ class Target {
           // Only track real packages, not plugin pseudo-packages.
           this.usedPackages[unibuild.pkg.name] = true;
         }
-        await compiler.eachUsedUnibuild({
+        compiler.eachUsedUnibuild({
           dependencies: unibuild.uses,
           arch: this.arch,
           isopackCache: isopackCache,
@@ -1020,7 +1020,7 @@ class Target {
 
       // This helper recursively adds unibuild's ordered dependencies to
       // this.unibuilds, then adds unibuild itself.
-      const add = async function (unibuild) {
+      const add = function (unibuild) {
         // If this has already been added, there's nothing to do.
         if (!_.has(needed, unibuild.id)) {
           return;
@@ -1036,7 +1036,7 @@ class Target {
         // eachUsedUnibuild does follow weak edges (ie, they affect the
         // ordering), but only if they point to a package in usedPackages (ie, a
         // package that SOMETHING uses strongly).
-        var processUnibuild = async function (usedUnibuild) {
+        var processUnibuild = function (usedUnibuild) {
           if (onStack[usedUnibuild.id]) {
             buildmessage.error(
                 "circular dependency between packages " +
@@ -1045,10 +1045,10 @@ class Target {
             return;
           }
           onStack[usedUnibuild.id] = true;
-          await add(usedUnibuild);
+          add(usedUnibuild);
           delete onStack[usedUnibuild.id];
         };
-        await compiler.eachUsedUnibuild({
+        compiler.eachUsedUnibuild({
           dependencies: unibuild.uses,
           arch: this.arch,
           isopackCache: isopackCache,

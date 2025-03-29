@@ -743,7 +743,7 @@ async function runLinters({inputSourceArch, isopackCache, sources,
     globalImports.push('Npm', 'Assets');
   }
 
-  await compiler.eachUsedUnibuild({
+  compiler.eachUsedUnibuild({
     dependencies: inputSourceArch.uses,
     arch: whichArch,
     isopackCache: isopackCache,
@@ -895,7 +895,7 @@ export async function getActivePluginPackages(isopk, {
   //
   // We pass archinfo.host here, not self.arch, because it may be more specific,
   // and because plugins always have to run on the host architecture.
-  await compiler.eachUsedUnibuild({
+  compiler.eachUsedUnibuild({
     dependencies: uses,
     arch: archinfo.host(),
     isopackCache: isopackCache,
@@ -983,7 +983,7 @@ compiler.eachUsedUnibuild = async function (
     }
     processedUnibuildId[unibuild.id] = true;
 
-    await callback(unibuild, {
+    callback(unibuild, {
       unordered: !!use.unordered,
       weak: !!use.weak
     });

@@ -1098,7 +1098,7 @@ export class PackageSourceBatch {
       }
     }
 
-    await compiler.eachUsedUnibuild({
+    compiler.eachUsedUnibuild({
       dependencies: self.unibuild.uses,
       arch: self.processor.arch,
       isopackCache: self.processor.isopackCache,
