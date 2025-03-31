@@ -1272,7 +1272,7 @@ export class PackageSourceBatch {
       buildmessage.assertInJob();
 
       const isopack = this.unibuild.pkg;
-      const activePluginPackages = await compiler.getActivePluginPackages(isopack, {
+      const activePluginPackages = compiler.getActivePluginPackages(isopack, {
         uses: this.unibuild.uses,
         isopackCache: this.processor.isopackCache
       });

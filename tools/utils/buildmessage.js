@@ -352,12 +352,13 @@ async function enterJob(options, f) {
     resetFns.push(currentNestingLevel.set(nestingLevel + 1));
 
     try {
-      return await f();
+      const result = f();
+      return result instanceof Promise ? await result : result;
     } finally {
       progress.reportProgressDone();
 
       while (resetFns.length) {
-        await resetFns.pop()();
+        resetFns.pop()();
       }
 
       if (debugBuild) {

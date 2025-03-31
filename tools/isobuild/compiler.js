@@ -246,7 +246,7 @@ compiler.getMinifiers = async function (packageSource, options) {
 
   var minifiers = [];
   for (const architecture of packageSource.architectures) {
-    var activePluginPackages = await getActivePluginPackages(options.isopack, {
+    var activePluginPackages = getActivePluginPackages(options.isopack, {
       isopackCache: options.isopackCache,
       uses: architecture.uses
     });
@@ -298,7 +298,7 @@ var lintUnibuild = async function ({isopack, isopackCache, sourceArch}) {
   // our return value.
   buildmessage.assertInJob();
 
-  var activePluginPackages = await getActivePluginPackages(
+  var activePluginPackages = getActivePluginPackages(
     isopack, {
       isopackCache,
       uses: sourceArch.uses
@@ -355,7 +355,7 @@ var compileUnibuild = Profile(function (options) {
   const watchSet = inputSourceArch.watchSet.clone();
 
   // *** Determine and load active plugins
-  const activePluginPackages = await getActivePluginPackages(isopk, {
+  const activePluginPackages = getActivePluginPackages(isopk, {
     uses: inputSourceArch.uses,
     isopackCache: isopackCache,
     // If other package is built from source, then we need to rebuild this
@@ -863,7 +863,7 @@ async function runLinters({inputSourceArch, isopackCache, sources,
 
 // takes an isopack and returns a list of packages isopack depends on,
 // containing at least one plugin
-export async function getActivePluginPackages(isopk, {
+export function getActivePluginPackages(isopk, {
   uses,
   isopackCache,
   pluginProviderPackageNames,

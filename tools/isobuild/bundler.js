@@ -848,7 +848,7 @@ class Target {
 
     await buildmessage.enterJob("building for " + this.arch, async () => {
       // Populate the list of unibuilds to load
-      await this._determineLoadOrder({
+      this._determineLoadOrder({
         packages: packages || []
       });
 
@@ -927,12 +927,12 @@ class Target {
   // - packages: an array of packages (or, properly speaking, unibuilds)
   //   to include. Each element should either be a Isopack object or a
   //   package name as a string
-  async _determineLoadOrder({packages}) {
+  _determineLoadOrder({packages}) {
     buildmessage.assertInCapture();
 
     const isopackCache = this.isopackCache;
 
-    await buildmessage.enterJob('linking the program', async () => {
+    buildmessage.enterJob('linking the program', () => {
       // Find the roots
       const rootUnibuilds = [];
       for (let p of packages) {
@@ -992,7 +992,7 @@ class Target {
       }.bind(this);
 
       for (const unibuild of rootUnibuilds) {
-        await addToGetsUsed(unibuild);
+        addToGetsUsed(unibuild);
       }
 
       if (buildmessage.jobHasMessages()) {
@@ -1075,14 +1075,14 @@ class Target {
           break;
         }
         // Now add it, after its ordered dependencies.
-        await add(needed[first]);
+        add(needed[first]);
       }
     });
   }
 
   // Run all the compiler plugins on all source files in the project. Returns an
   // array of PackageSourceBatches which contain the results of this processing.
-  async _runCompilerPlugins({
+  _runCompilerPlugins({
     minifiers = [],
     minifyMode = "development",
   }) {
