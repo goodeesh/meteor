@@ -11,7 +11,7 @@
     "prepare": "node scripts/build-deps.js"
   },
   "dependencies": {
-    "@meteorjs/crypto-browserify": "^3.12.1",
+    "@meteorjs/crypto-browserify": "^3.12.2",
     "assert": "^2.1.0",
     "browserify-zlib": "^0.2.0",
     "buffer": "^5.7.1",
