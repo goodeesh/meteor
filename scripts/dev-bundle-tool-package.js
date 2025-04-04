@@ -48,13 +48,13 @@ var packageJson = {
     "wordwrap": "1.0.0",
     "moment": "2.30.1",
     "rimraf": "2.6.2",
-    "glob": "7.1.6",
+    "glob": "11.0.1",
     ignore: "5.3.2",
     // XXX: When we update this, see if it fixes this Github issue:
     // https://github.com/jgm/CommonMark/issues/276 . If it does, remove the
     // workaround from the tool.
     "commonmark": "0.15.0",
-    escope: "3.6.0",
+    escope: "4.0.0",
     split2: "3.2.2",
     multipipe: "2.0.1",
     pathwatcher: "8.1.2",
@@ -62,7 +62,7 @@ var packageJson = {
     // The @wry/context package version must be compatible with the
     // version constraint imposed by optimism/package.json.
     optimism: "0.18.1",
-    "@wry/context": "0.6.0",
+    "@wry/context": "0.7.4",
     'lru-cache': '6.0.0',
     "anser": "2.1.1",
     'xmlbuilder2': '1.8.1',
