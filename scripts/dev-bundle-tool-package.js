@@ -61,7 +61,7 @@ var packageJson = {
     "vscode-nsfw": "2.1.8",
     // The @wry/context package version must be compatible with the
     // version constraint imposed by optimism/package.json.
-    optimism: "0.16.1",
+    optimism: "0.18.1",
     "@wry/context": "0.6.0",
     'lru-cache': '6.0.0',
     "anser": "2.1.1",
