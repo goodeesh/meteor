@@ -470,7 +470,7 @@ Object.assign(Isopack.prototype, {
         // (XXX we do, if the isopack was locally built, which is
         // the important case for debugging. it'd be nice to get this
         // case right.)
-      }, async function () {
+      }, function () {
         // Make a new Plugin API object for this plugin.
         const Plugin = self._makePluginApi(name);
         const __meteor_bootstrap__ = {
@@ -480,10 +480,12 @@ Object.assign(Isopack.prototype, {
           startupHooks: null
         };
 
-        await plugin.load({
+        plugin.load({
           Plugin,
           Profile,
           __meteor_bootstrap__
+        }).catch(err => {
+          buildmessage.error(err);
         });
       });
     }
