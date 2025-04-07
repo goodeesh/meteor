@@ -104,6 +104,62 @@ function isRegexLike(str) {
   return /[.*+?^${}()|[\]\\]/.test(str);
 }
 
+function color(text, code) {
+  return `\x1b[${code}m${text}\x1b[0m`;
+}
+
+function logTranspilation({
+  packageName,
+  inputFilePath,
+  usedSwc,
+  cacheHit,
+  isNodeModulesCode,
+  errorMessage = '',
+  tip = '',
+}) {
+  const transpiler = usedSwc ? 'SWC' : 'Babel';
+  const transpilerColor = usedSwc ? 32 : 33;
+  const label = color('[Transpiler]', 36);
+  const transpilerPart = `${label} Used ${color(
+    transpiler,
+    transpilerColor,
+  )} for`;
+  const filePathPadded = `${
+    packageName ? `${packageName}/` : ''
+  }${inputFilePath}`.padEnd(50);
+  let rawOrigin = '';
+  if (packageName) {
+    rawOrigin = `(package)`;
+  } else {
+    rawOrigin = isNodeModulesCode ? '(node_modules)' : '(app)';
+  }
+  const originPaddedRaw = rawOrigin.padEnd(35);
+  const originPaddedColored = packageName
+    ? originPaddedRaw
+    : isNodeModulesCode
+    ? color(originPaddedRaw, 90)
+    : color(originPaddedRaw, 35);
+  const cacheStatus = errorMessage
+    ? color('⚠️  Fallback', 33)
+    : usedSwc
+    ? cacheHit
+      ? color('🟢 Cache hit', 32)
+      : color('🔴 Cache miss', 31)
+    : '';
+  console.log(
+    `${transpilerPart} ${filePathPadded}${originPaddedColored}${cacheStatus}`,
+  );
+  if (errorMessage) {
+    console.log();
+    console.log(`  ↳ ${color('Error:', 31)} ${errorMessage}`);
+    if (tip) {
+      console.log();
+      console.log(`  ${color('💡 Tip:', 33)} ${tip}`);
+    }
+    console.log();
+  }
+}
+
 function isExcludedConfig(name, excludeList = [], startsWith) {
   if (!name || !excludeList?.length) return false;
   return excludeList.some(rule => {
@@ -292,6 +348,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
 
         let compilation;
         try {
+          let usedSwc = false;
           if (shouldUseSwc) {
             // Create a cache key based on the source hash and the compiler used
             const cacheKey = toBeAdded.hash;
@@ -299,18 +356,58 @@ BCp.processOneFileForTarget = function (inputFile, source) {
             compilation = this.readFromSwcCache({ cacheKey });
             // Return cached result if found.
             if (compilation) {
+              if (config?.verbose) {
+                logTranspilation({
+                  usedSwc: true,
+                  inputFilePath,
+                  packageName,
+                  isNodeModulesCode,
+                  cacheHit: true,
+                });
+              }
               return compilation;
             }
-            compilation = compileWithSwc(source, {}, { inputFilePath, features });
+            compilation = compileWithSwc(
+              source,
+              {},
+              { inputFilePath, features },
+            );
             // Save result in cache
             this.writeToSwcCache({ cacheKey, compilation });
+            usedSwc = true;
           } else {
             compilation = compileWithBabel(source, babelOptions, cacheOptions);
+            usedSwc = false;
+          }
+
+          if (config?.verbose) {
+            logTranspilation({
+              usedSwc,
+              inputFilePath,
+              packageName,
+              isNodeModulesCode,
+              cacheHit: false,
+            });
           }
         } catch (e) {
           this._swcIncompatible[toBeAdded.hash] = true;
           // If SWC fails, fall back to Babel
           compilation = compileWithBabel(source, babelOptions, cacheOptions);
+          if (config?.verbose) {
+            logTranspilation({
+              usedSwc: false,
+              inputFilePath,
+              packageName,
+              isNodeModulesCode,
+              cacheHit: false,
+              errorMessage: e?.message,
+              ...(e?.message?.includes(
+                'cannot be used outside of module code',
+              ) && {
+                tip: 'Remove nested import to support SWC transpilation and improve speed',
+              }),
+            });
+          }
         }
 
         return compilation;
