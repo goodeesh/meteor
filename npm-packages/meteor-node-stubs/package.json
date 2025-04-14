@@ -2,16 +2,16 @@
   "name": "meteor-node-stubs",
   "author": "Ben Newman <ben@meteor.com>",
   "description": "Stub implementations of Node built-in modules, a la Browserify",
-  "version": "1.2.13",
+  "version": "1.2.16",
   "main": "index.js",
   "license": "MIT",
   "homepage": "https://github.com/meteor/meteor/blob/devel/npm-packages/meteor-node-stubs/README.md",
   "type": "commonjs",
   "scripts": {
-    "prepare": "node scripts/build-deps.js"
+    "_prepare": "node scripts/build-deps.js"
   },
   "dependencies": {
-    "@meteorjs/crypto-browserify": "^3.12.1",
+    "@meteorjs/crypto-browserify": "^3.12.4",
     "assert": "^2.1.0",
     "browserify-zlib": "^0.2.0",
     "buffer": "^5.7.1",
@@ -81,5 +81,30 @@
   ],
   "bugs": {
     "url": "https://github.com/meteor/node-stubs/issues"
-  }
+  },
+  "bundleDependencies": [
+    "@meteorjs/crypto-browserify",
+    "assert",
+    "browserify-zlib",
+    "buffer",
+    "console-browserify",
+    "constants-browserify",
+    "domain-browser",
+    "events",
+    "https-browserify",
+    "os-browserify",
+    "path-browserify",
+    "process",
+    "punycode",
+    "querystring-es3",
+    "readable-stream",
+    "stream-browserify",
+    "stream-http",
+    "string_decoder",
+    "timers-browserify",
+    "tty-browserify",
+    "url",
+    "util",
+    "vm-browserify"
+  ]
 }
