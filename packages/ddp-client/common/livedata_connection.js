@@ -5,20 +5,18 @@ import { EJSON } from 'meteor/ejson';
 import { Random } from 'meteor/random';
 import { MongoID } from 'meteor/mongo-id';
 import { DDP } from './namespace.js';
-import MethodInvoker from './MethodInvoker.js';
+import { MethodInvoker } from './method_invoker';
 import {
   hasOwn,
   slice,
   keys,
   isEmpty,
   last,
-} from "meteor/ddp-common/utils.js";
-
-class MongoIDMap extends IdMap {
-  constructor() {
-    super(MongoID.idStringify, MongoID.idParse);
-  }
-}
+} from "meteor/ddp-common/utils";
+import { ConnectionStreamHandlers } from './connection_stream_handlers';
+import { MongoIDMap } from './mongo_id_map';
+import { MessageProcessors } from './message_processors';
+import { DocumentProcessors } from './document_processors';
 
 // @param url {String|Object} URL to Meteor app,
 //   or an object as a test hook (see code)
@@ -206,12 +204,6 @@ export class Connection {
     self._updatesForUnknownStores = {};
     // if we're blocking a migration, the retry func
     self._retryMigrate = null;
-
-    self.__flushBufferedWrites = Meteor.bindEnvironment(
-      self._flushBufferedWrites,
-      'flushing DDP buffered writes',
-      self
-    );
     // Collection name -> array of messages.
     self._bufferedWrites = {};
     // When current buffer of updates must be flushed at, in ms timestamp.
@@ -253,34 +245,63 @@ export class Connection {
       });
     }
 
+    this._streamHandlers = new ConnectionStreamHandlers(this);
+
     const onDisconnect = () => {
-      if (self._heartbeat) {
-        self._heartbeat.stop();
-        self._heartbeat = null;
+      if (this._heartbeat) {
+        this._heartbeat.stop();
+        this._heartbeat = null;
       }
     };
 
     if (Meteor.isServer) {
-      self._stream.on(
+      this._stream.on(
         'message',
         Meteor.bindEnvironment(
-          this.onMessage.bind(this),
+          msg => this._streamHandlers.onMessage(msg),
           'handling DDP message'
         )
       );
-      self._stream.on(
+      this._stream.on(
         'reset',
-        Meteor.bindEnvironment(this.onReset.bind(this), 'handling DDP reset')
+        Meteor.bindEnvironment(
+          () => this._streamHandlers.onReset(),
+          'handling DDP reset'
+        )
       );
-      self._stream.on(
+      this._stream.on(
         'disconnect',
         Meteor.bindEnvironment(onDisconnect, 'handling DDP disconnect')
       );
     } else {
-      self._stream.on('message', this.onMessage.bind(this));
-      self._stream.on('reset', this.onReset.bind(this));
-      self._stream.on('disconnect', onDisconnect);
+      this._stream.on('message', msg => this._streamHandlers.onMessage(msg));
+      this._stream.on('reset', () => this._streamHandlers.onReset());
+      this._stream.on('disconnect', onDisconnect);
     }
+
+    this._messageProcessors = new MessageProcessors(this);
+
+    // Expose message processor methods to maintain backward compatibility
+    this._livedata_connected = (msg) => this._messageProcessors._livedata_connected(msg);
+    this._livedata_data = (msg) => this._messageProcessors._livedata_data(msg);
+    this._livedata_nosub = (msg) => this._messageProcessors._livedata_nosub(msg);
+    this._livedata_result = (msg) => this._messageProcessors._livedata_result(msg);
+    this._livedata_error = (msg) => this._messageProcessors._livedata_error(msg);
+
+    this._documentProcessors = new DocumentProcessors(this);
+
+    // Expose document processor methods to maintain backward compatibility
+    this._process_added = (msg, updates) => this._documentProcessors._process_added(msg, updates);
+    this._process_changed = (msg, updates) => this._documentProcessors._process_changed(msg, updates);
+    this._process_removed = (msg, updates) => this._documentProcessors._process_removed(msg, updates);
+    this._process_ready = (msg, updates) => this._documentProcessors._process_ready(msg, updates);
+    this._process_updated = (msg, updates) => this._documentProcessors._process_updated(msg, updates);
+
+    // Also expose utility methods used by other parts of the system
+    this._pushUpdate = (updates, collection, msg) =>
+      this._documentProcessors._pushUpdate(updates, collection, msg);
+    this._getServerDoc = (collection, id) =>
+      this._documentProcessors._getServerDoc(collection, id);
   }
 
   // 'name' is the name of the data on the wire that should go in the
@@ -945,7 +966,7 @@ export class Connection {
   // documents.
   _saveOriginals() {
     if (! this._waitingForQuiescence()) {
-      this._flushBufferedWritesClient();
+      this._flushBufferedWrites();
     }
 
     Object.values(this._stores).forEach((store) => {
@@ -1104,6 +1125,7 @@ export class Connection {
     return Object.values(invokers).some((invoker) => !!invoker.sentMessage);
   }
 
+
   async _livedata_connected(msg) {
     const self = this;
 
@@ -1242,87 +1264,6 @@ export class Connection {
     }
   }
 
-  async _livedata_data(msg) {
-    const self = this;
-
-    if (self._waitingForQuiescence()) {
-      self._messagesBufferedUntilQuiescence.push(msg);
-
-      if (msg.msg === 'nosub') {
-        delete self._subsBeingRevived[msg.id];
-      }
-
-      if (msg.subs) {
-        msg.subs.forEach(subId => {
-          delete self._subsBeingRevived[subId];
-        });
-      }
-
-      if (msg.methods) {
-        msg.methods.forEach(methodId => {
-          delete self._methodsBlockingQuiescence[methodId];
-        });
-      }
-
-      if (self._waitingForQuiescence()) {
-        return;
-      }
-
-      // No methods or subs are blocking quiescence!
-      // We'll now process and all of our buffered messages, reset all stores,
-      // and apply them all at once.
-
-      const bufferedMessages = self._messagesBufferedUntilQuiescence;
-      for (const bufferedMessage of Object.values(bufferedMessages)) {
-        await self._processOneDataMessage(
-          bufferedMessage,
-          self._bufferedWrites
-        );
-      }
-
-      self._messagesBufferedUntilQuiescence = [];
-
-    } else {
-      await self._processOneDataMessage(msg, self._bufferedWrites);
-    }
-
-    // Immediately flush writes when:
-    //  1. Buffering is disabled. Or;
-    //  2. any non-(added/changed/removed) message arrives.
-    const standardWrite =
-      msg.msg === "added" ||
-      msg.msg === "changed" ||
-      msg.msg === "removed";
-
-    if (self._bufferedWritesInterval === 0 || ! standardWrite) {
-      await self._flushBufferedWrites();
-      return;
-    }
-
-    if (self._bufferedWritesFlushAt === null) {
-      self._bufferedWritesFlushAt =
-        new Date().valueOf() + self._bufferedWritesMaxAge;
-    } else if (self._bufferedWritesFlushAt < new Date().valueOf()) {
-      await self._flushBufferedWrites();
-      return;
-    }
-
-    if (self._bufferedWritesFlushHandle) {
-      clearTimeout(self._bufferedWritesFlushHandle);
-    }
-    self._bufferedWritesFlushHandle = setTimeout(() => {
-      // __flushBufferedWrites is a promise, so with this we can wait the promise to finish
-      // before doing something
-      self._liveDataWritesPromise = self.__flushBufferedWrites();
-
-      if (Meteor._isPromise(self._liveDataWritesPromise)) {
-        self._liveDataWritesPromise.finally(
-          () => (self._liveDataWritesPromise = undefined)
-        );
-      }
-    }, self._bufferedWritesInterval);
-  }
-
   _prepareBuffersToFlush() {
     const self = this;
     if (self._bufferedWritesFlushHandle) {
@@ -1339,61 +1280,49 @@ export class Connection {
     return writes;
   }
 
-  async _flushBufferedWritesServer() {
-    const self = this;
-    const writes = self._prepareBuffersToFlush();
-    await self._performWritesServer(writes);
-  }
-  _flushBufferedWritesClient() {
-    const self = this;
-    const writes = self._prepareBuffersToFlush();
-    self._performWritesClient(writes);
-  }
-  _flushBufferedWrites() {
-    const self = this;
-    return Meteor.isClient
-      ? self._flushBufferedWritesClient()
-      : self._flushBufferedWritesServer();
-  }
+  /**
+   * Server-side store updates handled asynchronously
+   * @private
+   */
   async _performWritesServer(updates) {
     const self = this;
 
-    if (self._resetStores || ! isEmpty(updates)) {
-      // Begin a transactional update of each store.
-
-      for (const [storeName, store] of Object.entries(self._stores)) {
+    if (self._resetStores || !isEmpty(updates)) {
+      // Start all store updates - keeping original loop structure
+      for (const store of Object.values(self._stores)) {
         await store.beginUpdate(
-          hasOwn.call(updates, storeName)
-            ? updates[storeName].length
-            : 0,
+          updates[store._name]?.length || 0,
           self._resetStores
         );
       }
 
       self._resetStores = false;
 
-      for (const [storeName, updateMessages] of Object.entries(updates)) {
+      // Process each store's updates sequentially as before
+      for (const [storeName, messages] of Object.entries(updates)) {
         const store = self._stores[storeName];
         if (store) {
-          for (const updateMessage of updateMessages) {
-            await store.update(updateMessage);
+          // Batch each store's messages in modest chunks to prevent event loop blocking
+          // while maintaining operation order
+          const CHUNK_SIZE = 100;
+          for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
+            const chunk = messages.slice(i, Math.min(i + CHUNK_SIZE, messages.length));
+
+            for (const msg of chunk) {
+              await store.update(msg);
+            }
+
+            await new Promise(resolve => process.nextTick(resolve));
           }
         } else {
-          // Nobody's listening for this data. Queue it up until
-          // someone wants it.
-          // XXX memory use will grow without bound if you forget to
-          // create a collection or just don't care about it... going
-          // to have to do something about that.
-          const updates = self._updatesForUnknownStores;
-
-          if (! hasOwn.call(updates, storeName)) {
-            updates[storeName] = [];
-          }
-
-          updates[storeName].push(...updateMessages);
+          // Queue updates for uninitialized stores
+          self._updatesForUnknownStores[storeName] =
+            self._updatesForUnknownStores[storeName] || [];
+          self._updatesForUnknownStores[storeName].push(...messages);
         }
       }
-      // End update transaction.
+
+      // Complete all updates
       for (const store of Object.values(self._stores)) {
         await store.endUpdate();
       }
@@ -1401,51 +1330,53 @@ export class Connection {
 
     self._runAfterUpdateCallbacks();
   }
+
+  /**
+   * Client-side store updates handled synchronously for optimistic UI
+   * @private
+   */
   _performWritesClient(updates) {
     const self = this;
 
-    if (self._resetStores || ! isEmpty(updates)) {
-      // Begin a transactional update of each store.
-
-      for (const [storeName, store] of Object.entries(self._stores)) {
+    if (self._resetStores || !isEmpty(updates)) {
+      // Synchronous store updates for client
+      Object.values(self._stores).forEach(store => {
         store.beginUpdate(
-          hasOwn.call(updates, storeName)
-            ? updates[storeName].length
-            : 0,
+          updates[store._name]?.length || 0,
           self._resetStores
         );
-      }
+      });
 
       self._resetStores = false;
 
-      for (const [storeName, updateMessages] of Object.entries(updates)) {
+      Object.entries(updates).forEach(([storeName, messages]) => {
         const store = self._stores[storeName];
         if (store) {
-          for (const updateMessage of updateMessages) {
-            store.update(updateMessage);
-          }
+          messages.forEach(msg => store.update(msg));
         } else {
-          // Nobody's listening for this data. Queue it up until
-          // someone wants it.
-          // XXX memory use will grow without bound if you forget to
-          // create a collection or just don't care about it... going
-          // to have to do something about that.
-          const updates = self._updatesForUnknownStores;
-
-          if (! hasOwn.call(updates, storeName)) {
-            updates[storeName] = [];
-          }
-
-          updates[storeName].push(...updateMessages);
+          self._updatesForUnknownStores[storeName] =
+            self._updatesForUnknownStores[storeName] || [];
+          self._updatesForUnknownStores[storeName].push(...messages);
         }
-      }
-      // End update transaction.
-      for (const store of Object.values(self._stores)) {
-        store.endUpdate();
-      }
+      });
+
+      Object.values(self._stores).forEach(store => store.endUpdate());
     }
 
     self._runAfterUpdateCallbacks();
+  }
+
+  /**
+   * Executes buffered writes either synchronously (client) or async (server)
+   * @private
+   */
+  async _flushBufferedWrites() {
+    const self = this;
+    const writes = self._prepareBuffersToFlush();
+
+    return Meteor.isClient
+      ? self._performWritesClient(writes)
+      : self._performWritesServer(writes);
   }
 
   // Call any callbacks deferred with _runWhenAllServerDocsAreFlushed whose
@@ -1457,160 +1388,6 @@ export class Connection {
     self._afterUpdateCallbacks = [];
     callbacks.forEach((c) => {
       c();
-    });
-  }
-
-  _pushUpdate(updates, collection, msg) {
-    if (! hasOwn.call(updates, collection)) {
-      updates[collection] = [];
-    }
-    updates[collection].push(msg);
-  }
-
-  _getServerDoc(collection, id) {
-    const self = this;
-    if (! hasOwn.call(self._serverDocuments, collection)) {
-      return null;
-    }
-    const serverDocsForCollection = self._serverDocuments[collection];
-    return serverDocsForCollection.get(id) || null;
-  }
-
-  async _process_added(msg, updates) {
-    const self = this;
-    const id = MongoID.idParse(msg.id);
-    const serverDoc = self._getServerDoc(msg.collection, id);
-    if (serverDoc) {
-      // Some outstanding stub wrote here.
-      const isExisting = serverDoc.document !== undefined;
-
-      serverDoc.document = msg.fields || Object.create(null);
-      serverDoc.document._id = id;
-
-      if (self._resetStores) {
-        // During reconnect the server is sending adds for existing ids.
-        // Always push an update so that document stays in the store after
-        // reset. Use current version of the document for this update, so
-        // that stub-written values are preserved.
-        const currentDoc = await self._stores[msg.collection].getDoc(msg.id);
-        if (currentDoc !== undefined) msg.fields = currentDoc;
-
-        self._pushUpdate(updates, msg.collection, msg);
-      } else if (isExisting) {
-        throw new Error('Server sent add for existing id: ' + msg.id);
-      }
-    } else {
-      self._pushUpdate(updates, msg.collection, msg);
-    }
-  }
-
-  _process_changed(msg, updates) {
-    const self = this;
-    const serverDoc = self._getServerDoc(msg.collection, MongoID.idParse(msg.id));
-    if (serverDoc) {
-      if (serverDoc.document === undefined)
-        throw new Error('Server sent changed for nonexisting id: ' + msg.id);
-      DiffSequence.applyChanges(serverDoc.document, msg.fields);
-    } else {
-      self._pushUpdate(updates, msg.collection, msg);
-    }
-  }
-
-  _process_removed(msg, updates) {
-    const self = this;
-    const serverDoc = self._getServerDoc(msg.collection, MongoID.idParse(msg.id));
-    if (serverDoc) {
-      // Some outstanding stub wrote here.
-      if (serverDoc.document === undefined)
-        throw new Error('Server sent removed for nonexisting id:' + msg.id);
-      serverDoc.document = undefined;
-    } else {
-      self._pushUpdate(updates, msg.collection, {
-        msg: 'removed',
-        collection: msg.collection,
-        id: msg.id
-      });
-    }
-  }
-
-  _process_updated(msg, updates) {
-    const self = this;
-    // Process "method done" messages.
-
-    msg.methods.forEach((methodId) => {
-      const docs = self._documentsWrittenByStub[methodId] || {};
-      Object.values(docs).forEach((written) => {
-        const serverDoc = self._getServerDoc(written.collection, written.id);
-        if (! serverDoc) {
-          throw new Error('Lost serverDoc for ' + JSON.stringify(written));
-        }
-        if (! serverDoc.writtenByStubs[methodId]) {
-          throw new Error(
-            'Doc ' +
-              JSON.stringify(written) +
-              ' not written by  method ' +
-              methodId
-          );
-        }
-        delete serverDoc.writtenByStubs[methodId];
-        if (isEmpty(serverDoc.writtenByStubs)) {
-          // All methods whose stubs wrote this method have completed! We can
-          // now copy the saved document to the database (reverting the stub's
-          // change if the server did not write to this object, or applying the
-          // server's writes if it did).
-
-          // This is a fake ddp 'replace' message.  It's just for talking
-          // between livedata connections and minimongo.  (We have to stringify
-          // the ID because it's supposed to look like a wire message.)
-          self._pushUpdate(updates, written.collection, {
-            msg: 'replace',
-            id: MongoID.idStringify(written.id),
-            replace: serverDoc.document
-          });
-          // Call all flush callbacks.
-
-          serverDoc.flushCallbacks.forEach((c) => {
-            c();
-          });
-
-          // Delete this completed serverDocument. Don't bother to GC empty
-          // IdMaps inside self._serverDocuments, since there probably aren't
-          // many collections and they'll be written repeatedly.
-          self._serverDocuments[written.collection].remove(written.id);
-        }
-      });
-      delete self._documentsWrittenByStub[methodId];
-
-      // We want to call the data-written callback, but we can't do so until all
-      // currently buffered messages are flushed.
-      const callbackInvoker = self._methodInvokers[methodId];
-      if (! callbackInvoker) {
-        throw new Error('No callback invoker for method ' + methodId);
-      }
-
-      self._runWhenAllServerDocsAreFlushed(
-        (...args) => callbackInvoker.dataVisible(...args)
-      );
-    });
-  }
-
-  _process_ready(msg, updates) {
-    const self = this;
-    // Process "sub ready" messages. "sub ready" messages don't take effect
-    // until all current server documents have been flushed to the local
-    // database. We can use a write fence to implement this.
-
-    msg.subs.forEach((subId) => {
-      self._runWhenAllServerDocsAreFlushed(() => {
-        const subRecord = self._subscriptions[subId];
-        // Did we already unsubscribe?
-        if (!subRecord) return;
-        // Did we already receive a ready message? (Oops!)
-        if (subRecord.ready) return;
-        subRecord.ready = true;
-        subRecord.readyCallback && subRecord.readyCallback();
-        subRecord.readyDeps.changed();
-      });
     });
   }
 
@@ -1650,93 +1427,6 @@ export class Connection {
       // There aren't any buffered docs --- we can call f as soon as the current
       // round of updates is applied!
       runFAfterUpdates();
-    }
-  }
-
-  async _livedata_nosub(msg) {
-    const self = this;
-
-    // First pass it through _livedata_data, which only uses it to help get
-    // towards quiescence.
-    await self._livedata_data(msg);
-
-    // Do the rest of our processing immediately, with no
-    // buffering-until-quiescence.
-
-    // we weren't subbed anyway, or we initiated the unsub.
-    if (! hasOwn.call(self._subscriptions, msg.id)) {
-      return;
-    }
-
-    // XXX COMPAT WITH 1.0.3.1 #errorCallback
-    const errorCallback = self._subscriptions[msg.id].errorCallback;
-    const stopCallback = self._subscriptions[msg.id].stopCallback;
-
-    self._subscriptions[msg.id].remove();
-
-    const meteorErrorFromMsg = msgArg => {
-      return (
-        msgArg &&
-        msgArg.error &&
-        new Meteor.Error(
-          msgArg.error.error,
-          msgArg.error.reason,
-          msgArg.error.details
-        )
-      );
-    };
-
-    // XXX COMPAT WITH 1.0.3.1 #errorCallback
-    if (errorCallback && msg.error) {
-      errorCallback(meteorErrorFromMsg(msg));
-    }
-
-    if (stopCallback) {
-      stopCallback(meteorErrorFromMsg(msg));
-    }
-  }
-
-  async _livedata_result(msg) {
-    // id, result or error. error has error (code), reason, details
-
-    const self = this;
-
-    // Lets make sure there are no buffered writes before returning result.
-    if (! isEmpty(self._bufferedWrites)) {
-      await self._flushBufferedWrites();
-    }
-
-    // find the outstanding request
-    // should be O(1) in nearly all realistic use cases
-    if (isEmpty(self._outstandingMethodBlocks)) {
-      Meteor._debug('Received method result but no methods outstanding');
-      return;
-    }
-    const currentMethodBlock = self._outstandingMethodBlocks[0].methods;
-    let i;
-    const m = currentMethodBlock.find((method, idx) => {
-      const found = method.methodId === msg.id;
-      if (found) i = idx;
-      return found;
-    });
-    if (!m) {
-      Meteor._debug("Can't match method response to original method call", msg);
-      return;
-    }
-
-    // Remove from current method block. This may leave the block empty, but we
-    // don't move on to the next block until the callback has been delivered, in
-    // _outstandingMethodFinished.
-    currentMethodBlock.splice(i, 1);
-
-    if (hasOwn.call(msg, 'error')) {
-      m.receiveResult(
-        new Meteor.Error(msg.error.error, msg.error.reason, msg.error.details)
-      );
-    } else {
-      // msg.result may be undefined if the method didn't return a
-      // value
-      m.receiveResult(undefined, msg.result);
     }
   }
 
@@ -1806,11 +1496,6 @@ export class Connection {
     self._outstandingMethodBlocks[0].methods.forEach(m => {
       m.sendMessage();
     });
-  }
-
-  _livedata_error(msg) {
-    Meteor._debug('Received error from server: ', msg.reason);
-    if (msg.offendingMessage) Meteor._debug('For: ', msg.offendingMessage);
   }
 
   _sendOutstandingMethodBlocksMessages(oldOutstandingMethodBlocks) {
