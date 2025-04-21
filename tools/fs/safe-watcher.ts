@@ -1,6 +1,6 @@
 import { Stats } from 'fs';
 import { dirname } from "path";
-import ParcelWatcher from "@parcel/watcher";
+import chokidar from "chokidar";
 import LRUCache from 'lru-cache';
 
 import { Profile } from "../tool-env/profile";
@@ -52,15 +52,15 @@ function deleteEntry(path: string): void {
   return entries.delete(path);
 }
 
-// Watch roots are directories for which we have an active ParcelWatcher subscription.
+// Watch roots are directories for which we have an active chokidar watcher.
 const watchRoots = new Set<string>();
-// For each watch root, store its active subscription.
-const dirSubscriptions = new Map<string, ParcelWatcher.AsyncSubscription>();
+// For each watch root, store its active watcher.
+const dirSubscriptions = new Map<string, chokidar.FSWatcher>();
 // A set of roots that are known to be unwatchable.
 const ignoredWatchRoots = new Set<string>();
 
 // Set METEOR_WATCH_FORCE_POLLING environment variable to a truthy value to
-// force the use of files.watchFile instead of ParcelWatcher.
+// force the use of files.watchFile instead of chokidar.
 let watcherEnabled = !JSON.parse(process.env.METEOR_WATCH_FORCE_POLLING || "false");
 
 /**
@@ -119,7 +119,7 @@ function shouldIgnorePath(absPath: string): boolean {
 }
 
 /**
- * Ensure that the given directory is being watched by @parcel/watcher.
+ * Ensure that the given directory is being watched by chokidar.
  * If it is not a directory or is unwatchable, it is immediately added to an ignore set.
  */
 async function ensureWatchRoot(dirPath: string): Promise<void> {
@@ -139,10 +139,10 @@ async function ensureWatchRoot(dirPath: string): Promise<void> {
   for (const root of Array.from(watchRoots)) {
     const rel = pathRelative(dirPath, root);
     if (root !== dirPath && !rel.startsWith("..") && !rel.startsWith("/")) {
-      const sub = dirSubscriptions.get(root);
-      if (sub) {
+      const watcher = dirSubscriptions.get(root);
+      if (watcher) {
         try {
-          await sub.unsubscribe();
+          await watcher.close();
         } catch (_) {
           /* ignore errors */
         }
@@ -168,34 +168,43 @@ async function ensureWatchRoot(dirPath: string): Promise<void> {
   }
 
   // Set up ignore patterns to skip deep node_modules and .meteor/local cache
-  const ignorePatterns = ["**/node_modules/**", "**/.meteor/local/**"];
   try {
-    const subscription = await ParcelWatcher.subscribe(
-        osDirPath,
-        (err, events) => {
-          if (err) {
-            console.error(`Parcel watcher error on ${osDirPath}:`, err);
-            // Only disable native watching for critical errors (like ENOSPC).
-            // @ts-ignore
-            if (err.code === "ENOSPC" || err.errno === require("constants").ENOSPC) {
-              fallbackToPolling();
-            }
-            return;
-          }
-          // Dispatch each event to any registered entries.
-          for (const event of events) {
-            const changedPath = toPosixPath(event.path);
-            const entry = getEntry(changedPath);
-            if (!entry) continue;
-            // In Meteor's safe-watcher API, both create/update trigger "change" events.
-            const evtType = event.type === "delete" ? "delete" : "change";
-            entry._fire(evtType);
-          }
-        },
-        { ignore: ignorePatterns }
-    );
+    // Create a chokidar watcher
+    const watcher = chokidar.watch(osDirPath, {
+      ignored: (file) => file.includes('node_modules') || file.includes('.meteor/local'),
+      ignoreInitial: true,
+      followSymlinks: false,
+      persistent: false,
+    });
+
+    // Handle file events
+    const handleEvent = (eventType: string, path: string) => {
+      const changedPath = toPosixPath(path);
+      const entry = getEntry(changedPath);
+      if (!entry) return;
+
+      // In Meteor's safe-watcher API, both add/change trigger "change" events,
+      // while unlink triggers "delete" events
+      const evtType = eventType === 'unlink' ? "delete" : "change";
+      entry._fire(evtType);
+    };
+
+    // Set up event handlers
+    watcher.on('add', path => handleEvent('add', path));
+    watcher.on('change', path => handleEvent('change', path));
+    watcher.on('unlink', path => handleEvent('unlink', path));
+
+    // Handle errors
+    watcher.on('error', (error) => {
+      // console.error(`Chokidar watcher error on ${osDirPath}:`, error);
+      // Only disable native watching for critical errors (like ENOSPC).
+      if (error.code === "ENOSPC" || error.errno === require("constants").ENOSPC) {
+        fallbackToPolling();
+      }
+    });
+
     watchRoots.add(dirPath);
-    dirSubscriptions.set(dirPath, subscription);
+    dirSubscriptions.set(dirPath, watcher);
   } catch (e: any) {
     if (
         e &&
@@ -311,22 +320,22 @@ export function addWatchRoot(absPath: string) {
   ensureWatchRoot(watchTarget);
 }
 
-async function safeUnsubscribeSub(root: string) {
-  const sub = dirSubscriptions.get(root);
-  if (!sub) return;  // Already unsubscribed.
-  // Remove from our maps immediately to prevent further unsubscribe calls.
+async function safeCloseWatcher(root: string) {
+  const watcher = dirSubscriptions.get(root);
+  if (!watcher) return;  // Already closed.
+  // Remove from our maps immediately to prevent further close calls.
   dirSubscriptions.delete(root);
   watchRoots.delete(root);
   try {
-    await sub.unsubscribe();
+    await watcher.close();
   } catch (e) {
-    console.error(`Error during unsubscribe for ${root}:`, e);
+    console.error(`Error during watcher close for ${root}:`, e);
   }
 }
 
 export async function closeAllWatchers() {
   for (const root of Array.from(watchRoots)) {
-    await safeUnsubscribeSub(root);
+    await safeCloseWatcher(root);
   }
 }
 
