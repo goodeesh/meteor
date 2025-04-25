@@ -9,10 +9,16 @@ Package.registerBuildPlugin({
   name: "minifyStdJS",
   use: [
     'minifier-js',
-    'ecmascript'
+    'ecmascript',
+    'caching-minifier',
+    'source-maps',
   ],
   npmDependencies: {
-    "@babel/runtime": "7.18.9",
+    'meteor-package-install-swc': '1.1.2',
+    'acorn': '8.10.0',
+    '@babel/parser': '7.22.7',
+    'terser': '5.19.2',
+    "@babel/runtime": "7.18.9"
   },
   sources: [
     'plugin/minify-js.js',
@@ -22,4 +28,6 @@ Package.registerBuildPlugin({
 
 Package.onUse(function(api) {
   api.use('isobuild:minifier-plugin@1.0.0');
+  api.use('caching-minifier'); 
+  api.use('source-maps'); 
 });

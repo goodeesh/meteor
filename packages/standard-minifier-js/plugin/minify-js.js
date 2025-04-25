@@ -1,105 +1,233 @@
-import { extractModuleSizesTree } from "./stats.js";
+const { extractModuleSizesTree } = require("./stats.js");
+const { CachingMinifier } = require("meteor/caching-minifier");
+const generatePackageMap = require('./generate-package-map.js');
+const { CombinedFile } = require('meteor/source-maps');
 
-Plugin.registerMinifier({
-    extensions: ['js'],
-    archMatching: 'web',
-  },
-  () => new MeteorMinifier()
-);
+const statsEnabled = process.env.DISABLE_CLIENT_STATS !== 'true'
 
-class MeteorMinifier {
-
-  async processFilesForBundle (files, options) {
-    const mode = options.minifyMode;
-
-    // don't minify anything for development
-    if (mode === 'development') {
-      files.forEach(function (file) {
-        file.addJavaScript({
-          data: file.getContentsAsBuffer(),
-          sourceMap: file.getSourceMap(),
-          path: file.getPathInBundle(),
-        });
-      });
-      return;
-    }
-
-    // this function tries its best to locate the original source file
-    // that the error being reported was located inside of
-    function maybeThrowMinifyErrorBySourceFile(error, file) {
-
-      const lines = file.getContentsAsString().split(/\n/);
-      const lineContent = lines[error.line - 1];
-
-      let originalSourceFileLineNumber = 0;
-
-      // Count backward from the failed line to find the oringal filename
-      for (let i = (error.line - 1); i >= 0; i--) {
-          let currentLine = lines[i];
-
-          // If the line is a boatload of slashes (8 or more), we're in the right place.
-          if (/^\/\/\/{6,}$/.test(currentLine)) {
-
-              // If 4 lines back is the same exact line, we've found the framing.
-              if (lines[i - 4] === currentLine) {
-
-                  // So in that case, 2 lines back is the file path.
-                  let originalFilePath = lines[i - 2].substring(3).replace(/\s+\/\//, "");
-
-                  throw new Error(
-                      `terser minification error (${error.name}:${error.message})\n` +
-                      `Source file: ${originalFilePath}  (${originalSourceFileLineNumber}:${error.col})\n` +
-                      `Line content: ${lineContent}\n`);
-              }
-          }
-          originalSourceFileLineNumber++;
+if (typeof Profile === 'undefined') {
+  if (Plugin.Profile) {
+    Profile = Plugin.Profile;
+  } else {
+    Profile = function (label, func) {
+      return function () {
+        return func.apply(this, arguments);
       }
     }
-
-    // this object will collect all the minified code in the
-    // data field and post-minfiication file sizes in the stats field
-    const toBeAdded = {
-      data: "",
-      stats: Object.create(null)
-    };
-
-    for await (file of files) {
-      // Don't reminify *.min.js.
-      if (/\.min\.js$/.test(file.getPathInBundle())) {
-        toBeAdded.data += file.getContentsAsString();
-      }
-      else {
-        let minified;
-        try {
-          minified = await meteorJsMinify(file.getContentsAsString());
-        }
-        catch (err) {
-          maybeThrowMinifyErrorBySourceFile(err, file);
-
-          throw new Error(`terser minification error (${err.name}:${err.message})\n` +
-                          `Bundled file: ${file.getPathInBundle()}  (${err.line}:${err.col})\n`);
-        }
-
-        const ast = extractModuleSizesTree(minified.code);
-
-        if (ast) {
-          toBeAdded.stats[file.getPathInBundle()] = [Buffer.byteLength(minified.code), ast];
-        } else {
-          toBeAdded.stats[file.getPathInBundle()] = Buffer.byteLength(minified.code);
-        }
-        // append the minified code to the "running sum"
-        // of code being minified
-        toBeAdded.data += minified.code;
-      }
-      toBeAdded.data += '\n\n';
-
-      Plugin.nudge();
-    }
-
-    // this is where the minified code gets added to one
-    // JS file that is delivered to the client
-    if (files.length) {
-      files[0].addJavaScript(toBeAdded);
+    Profile.time = function (label, func) {
+      func();
     }
   }
 }
+
+let swc;
+
+Plugin.registerMinifier({
+  extensions: ['js'],
+  archMatching: 'web'
+}, function () {
+  var minifier = new MeteorMinifier();
+  return minifier;
+});
+
+class MeteorMinifier extends CachingMinifier {
+  constructor() {
+    super({
+      minifierName: 'fast-minifier'
+    })
+  }
+
+  _minifyWithSwc(file) {
+    swc = swc || require('meteor-package-install-swc'); 
+    const NODE_ENV = process.env.NODE_ENV || 'development';
+
+    let map = file.getSourceMap();
+    let content = file.getContentsAsString();
+
+    if (!map) {
+      map = generatePackageMap(content, file.getPathInBundle());
+    }
+
+    if (map) {
+      map = JSON.stringify(map);
+    }
+
+    return swc.minifySync(
+      content,
+      {
+        ecma: 5,
+        compress: {
+          drop_debugger: false,
+
+          unused: true,
+          dead_code: true,
+          typeofs: false,
+
+          global_defs: {
+            'process.env.NODE_ENV': NODE_ENV,
+          },
+        },
+        sourceMap: map ? {
+          content: map,
+        } : undefined,
+        safari10: true,
+        inlineSourcesContent: true
+      }
+    );
+  }
+
+  _minifyWithTerser(file) {
+    let terser = require('terser');
+    const NODE_ENV = process.env.NODE_ENV || 'development';
+
+    return terser.minify(file.getContentsAsString(), {
+      compress: {
+        drop_debugger: false,
+        unused: false,
+        dead_code: true,
+        global_defs: {
+          "process.env.NODE_ENV": NODE_ENV
+        }
+      },
+      // Fix issue meteor/meteor#9866, as explained in this comment:
+      // https://github.com/mishoo/UglifyJS2/issues/1753#issuecomment-324814782
+      // And fix terser issue #117: https://github.com/terser-js/terser/issues/117
+      safari10: true,
+      sourceMap: {
+        content: file.getSourceMap()
+      }
+    });
+  }
+
+  minifyOneFile(file) {
+    try {
+      return this._minifyWithSwc(file);
+    } catch (swcError) {
+      try {
+        // swc always parses as if the file is a module, which is
+        // too strict for some Meteor packages. Try again with terser
+        return this._minifyWithTerser(file).await();
+      } catch (_) {
+        // swc has a much better error message, so we use it
+        throw swcError;
+      }
+    }
+  }
+}
+
+MeteorMinifier.prototype.processFilesForBundle = Profile('processFilesForBundle', function (files, options) {
+  var mode = options.minifyMode;
+
+  // don't minify anything for development
+  if (mode === 'development') {
+    files.forEach(function (file) {
+      let map = file.getSourceMap();
+      if (!map) {
+        map = generatePackageMap(file.getContentsAsString(), file.getPathInBundle());
+      }
+
+      file.addJavaScript({
+        data: file.getContentsAsBuffer(),
+        sourceMap: map,
+        path: file.getPathInBundle(),
+      });
+    });
+    return;
+  }
+
+  const minifiedResults = [];
+  const toBeAdded = {
+    data: "",
+    stats: Object.create(null)
+  };
+
+  var combinedFile = new CombinedFile();
+
+  files.forEach(file => {
+    // Don't reminify *.min.js.
+    // FIXME: this still minifies .min.js app files since they were all combined into app.js
+    if (/\.min\.js$/.test(file.getPathInBundle())) {
+      minifiedResults.push({
+        code: file.getContentsAsString(),
+        map: file.getSourceMap()
+      });
+    } else {
+      var minified;
+      let label = 'minify file'
+      if (file.getPathInBundle() === 'app/app.js') {
+        label = 'minify app/app.js'
+      }
+      if (file.getPathInBundle() === 'packages/modules.js') {
+        label = 'minify packages/modules.js'
+      }
+
+      try {
+        Profile.time(label, () => {
+          minified = this.minifyFile(file);
+        });
+
+        if (!(minified && typeof minified.code === "string")) {
+          throw new Error();
+        }
+
+      } catch (err) {
+        var filePath = file.getPathInBundle();
+
+        err.message += " while minifying " + filePath;
+        throw err;
+      }
+
+      if (statsEnabled) {
+        let tree;
+        Profile.time('extractModuleSizesTree', () => {
+          tree = extractModuleSizesTree(minified.code);
+        });
+
+        if (tree) {
+          toBeAdded.stats[file.getPathInBundle()] =
+            [Buffer.byteLength(minified.code), tree];
+        } else {
+          toBeAdded.stats[file.getPathInBundle()] =
+            Buffer.byteLength(minified.code);
+        }
+      }
+
+      minifiedResults.push({
+        file: file.getPathInBundle(),
+        code: minified.code,
+        map: minified.map
+      });
+    }
+
+    Plugin.nudge();
+  });
+
+  let output;
+  Profile.time('concat', () => {
+    minifiedResults.forEach(function (result, index) {
+      if (index > 0) {
+        combinedFile.addGeneratedCode('\n\n');
+      }
+
+      let map = result.map;
+
+      if (typeof map === 'string') {
+        map = JSON.parse(result.map);
+      }
+
+      combinedFile.addCodeWithMap(result.file, { code: result.code, map });
+
+      Plugin.nudge();
+    });
+
+    output = combinedFile.build();
+  });
+
+  if (files.length) {
+    Profile.time('addJavaScript', () => {
+      toBeAdded.data = output.code;
+      toBeAdded.sourceMap = output.map;
+      files[0].addJavaScript(toBeAdded);
+    });
+  }
+});
