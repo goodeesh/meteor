@@ -18,6 +18,6 @@ Package.onUse(function(api) {
 Package.onTest(function(api) {
   api.use('ecmascript');
   api.use('mocha');
-  api.use('zodern:source-maps');
+  api.use('source-maps');
   api.mainModule('tests/index.js');
 });

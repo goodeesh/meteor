@@ -1,22 +1,17 @@
 Package.describe({
+  name: 'minifier-js',
   summary: "JavaScript minifier",
-  version: '3.0.1',
+  version: "4.1.0",
+  documentation: null,
+  git: "https://github.com/zodern/minify-js-sourcemaps.git"
 });
 
 Npm.depends({
-  terser: "5.31.0"
+  "terser": "4.8.0"
 });
 
 Package.onUse(function (api) {
-  api.use('ecmascript');
-  api.use('babel-compiler');
-  api.mainModule('minifier.js', 'server');
-  api.export('meteorJsMinify');
-});
-
-Package.onTest(function (api) {
-  api.use('ecmascript');
-  api.use('tinytest');
-  api.use('minifier-js');
-  api.mainModule('minifier-tests.js', 'server');
+  api.use('babel-compiler@6.18.2 || 7.0.0');
+  api.export(['meteorJsMinify']);
+  api.addFiles(['plugin/minify-js.js'], 'server');
 });

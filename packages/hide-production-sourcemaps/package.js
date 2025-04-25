@@ -1,5 +1,5 @@
 Package.describe({
-  name: 'zodern:hide-production-sourcemaps',
+  name: 'hide-production-sourcemaps',
   version: '1.2.1',
   // Brief, one-line summary of the package.
   summary: 'Hide sourcemaps in production',
@@ -18,5 +18,5 @@ Package.onUse(function(api) {
 
 Package.onTest(function(api) {
   api.use('tinytest');
-  api.use('zodern:hide-production-sourcemaps');
+  api.use('hide-production-sourcemaps');
 });
