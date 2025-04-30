@@ -53,8 +53,8 @@ testAsyncMulti(
   "livedata server - onConnection doesn't get callback after stop.",
   [
     function (test, expect) {
-      var afterStop = false;
-      var expectStop1 = expect();
+      let afterStop = false;
+      const expectStop1 = expect();
       var stopHandle1 = Meteor.onConnection(function (conn) {
         stopHandle2.stop();
         stopHandle1.stop();
@@ -68,7 +68,7 @@ testAsyncMulti(
       });
 
       // trigger a connection
-      var expectConnection = expect();
+      const expectConnection = expect();
       makeTestConnection(
         test,
         function (clientConn, serverConn) {
@@ -83,16 +83,23 @@ testAsyncMulti(
 );
 
 Meteor.methods({
-  livedata_server_test_inner: function () {
+  livedata_server_test_inner() {
     return this.connection && this.connection.id;
   },
 
-  livedata_server_test_outer: async function () {
+  async livedata_server_test_outer() {
     return await Meteor.callAsync("livedata_server_test_inner");
   },
 
-  livedata_server_test_setuserid: function (userId) {
+  livedata_server_test_setuserid(userId) {
     this.setUserId(userId);
+  },
+
+  livedata_server_test_streaming() {
+    for (const n of [1, 2, 3]) {
+      this.progress(n);
+    }
+    return "done";
   },
 });
 
@@ -100,8 +107,8 @@ Tinytest.addAsync(
   "livedata server - onMessage hook",
   function (test, onComplete) {
     var cb = Meteor.onMessage(function (msg, session) {
-      if (msg.method !== 'livedata_server_test_inner') return;
-            test.equal(msg.method, "livedata_server_test_inner");
+      if (msg.method !== "livedata_server_test_inner") return;
+      test.equal(msg.method, "livedata_server_test_inner");
       cb.stop();
       onComplete();
     });
@@ -159,10 +166,10 @@ Tinytest.addAsync(
 );
 
 // connectionId -> callback
-var onSubscription = {};
+const onSubscription = {};
 
 Meteor.publish("livedata_server_test_sub", function (connectionId) {
-  var callback = onSubscription[connectionId];
+  const callback = onSubscription[connectionId];
   if (callback) callback(this);
   this.stop();
 });
@@ -170,9 +177,9 @@ Meteor.publish("livedata_server_test_sub", function (connectionId) {
 Meteor.publish(
   "livedata_server_test_sub_method",
   async function (connectionId) {
-    var callback = onSubscription[connectionId];
+    const callback = onSubscription[connectionId];
     if (callback) {
-      var id = await Meteor.callAsync("livedata_server_test_inner");
+      const id = await Meteor.callAsync("livedata_server_test_inner");
       callback(id);
     }
     this.stop();
@@ -182,9 +189,9 @@ Meteor.publish(
 Meteor.publish(
   "livedata_server_test_sub_context",
   async function (connectionId, userId) {
-    var callback = onSubscription[connectionId];
-    var methodInvocation = DDP._CurrentMethodInvocation.get();
-    var publicationInvocation = DDP._CurrentPublicationInvocation.get();
+    const callback = onSubscription[connectionId];
+    const methodInvocation = DDP._CurrentMethodInvocation.get();
+    const publicationInvocation = DDP._CurrentPublicationInvocation.get();
 
     // Check the publish function's environment variables and context.
     if (callback) {
@@ -194,8 +201,9 @@ Meteor.publish(
     // Check that onStop callback is have the same context as the publish function
     // and that it runs with the same environment variables as this publish function.
     this.onStop(function () {
-      var onStopMethodInvocation = DDP._CurrentMethodInvocation.get();
-      var onStopPublicationInvocation = DDP._CurrentPublicationInvocation.get();
+      const onStopMethodInvocation = DDP._CurrentMethodInvocation.get();
+      const onStopPublicationInvocation =
+        DDP._CurrentPublicationInvocation.get();
       callback.call(
         this,
         onStopMethodInvocation,
@@ -247,7 +255,7 @@ Tinytest.addAsync(
   "livedata server - verify context in publish function",
   function (test, onComplete) {
     makeTestConnection(test, function (clientConn, serverConn) {
-      var userId = "someUserId";
+      const userId = "someUserId";
       onSubscription[serverConn.id] = function (
         methodInvocation,
         publicationInvocation,
@@ -276,22 +284,22 @@ let onSubscriptions = {};
 
 Meteor.publish({
   publicationObject() {
-    let callback = onSubscriptions;
+    const callback = onSubscriptions;
     if (callback) callback();
     this.stop();
   },
 });
 
 Meteor.publish({
-  publication_object: function () {
-    let callback = onSubscriptions;
+  publication_object() {
+    const callback = onSubscriptions;
     if (callback) callback();
     this.stop();
   },
 });
 
 Meteor.publish("publication_compatibility", function () {
-  let callback = onSubscriptions;
+  const callback = onSubscriptions;
   if (callback) callback();
   this.stop();
 });
@@ -445,152 +453,188 @@ Tinytest.addAsync("livedata server - waiting for Promise", (test, onComplete) =>
 /**
  * https://github.com/meteor/meteor/issues/13212
  */
-Tinytest.addAsync('livedata server - publish cursor is properly awaited', async function (test) {
-  let sub = null;
+Tinytest.addAsync(
+  "livedata server - publish cursor is properly awaited",
+  async function (test) {
+    let sub = null;
 
-  const { conn, messages, cleanup } = await captureConnectionMessages(test);
+    const { conn, messages, cleanup } = await captureConnectionMessages(test);
 
-  const coll = new Mongo.Collection('items', {
-    defineMutationMethods: false,
-  });
+    const coll = new Mongo.Collection("items", {
+      defineMutationMethods: false,
+    });
 
-  for (let i = 0; i < 10; i++) {
-    await coll.removeAsync({ _id: `item_${i}` })
-    await coll.insertAsync({ _id: `item_${i}`, title: `Item #${i}` });
-  }
-
-  const publicationName = `publication_${Random.id()}`
-
-  delete Meteor.server.publish_handlers[publicationName];
-
-  Meteor.publish(publicationName, async function (count) {
-    return coll.find({}, { limit: count });
-  });
-
-  const reactiveVar = new ReactiveVar(1);
-
-  const computation = Tracker.autorun(() => {
-    sub = conn.subscribe(publicationName, reactiveVar.get());
-  });
-
-  await Meteor._sleepForMs(100);
-
-  reactiveVar.set(2);
-
-  await Meteor._sleepForMs(100);
-
-  const expectedMessages = ['sub', 'added', 'ready', 'sub', 'unsub', 'added', 'ready', 'nosub']
-
-  /**
-   * There shouldn't ever be `removed` messages here, otherwise the UI will glitch
-   */
-  const parsedMessages = messages.map(m => m.msg)
-
-  test.equal(parsedMessages, expectedMessages)
-
-  computation.stop();
-
-  cleanup()
-});
-
-Tinytest.addAsync('livedata server - stopping a handle should preserve its context on callbacks', async function (test) {
-  const { conn, messages, cleanup } = await captureConnectionMessages(test);
-
-  const coll = new Mongo.Collection('items', {
-    defineMutationMethods: false,
-  });
-
-  for (let i = 0; i < 10; i++) {
-    await coll.removeAsync({ _id: `item_${i}` })
-    await coll.insertAsync({ _id: `item_${i}`, title: `Item #${i}` });
-  }
-
-  const publicationName = `publication_${Random.id()}`
-
-  delete Meteor.server.publish_handlers[publicationName];
-
-  Meteor.publish(publicationName, async function () {
-    const user = {
-      _id: 'user_id',
-      customer: 'customer_id',
+    for (let i = 0; i < 10; i++) {
+      await coll.removeAsync({ _id: `item_${i}` });
+      await coll.insertAsync({ _id: `item_${i}`, title: `Item #${i}` });
     }
 
-    if (user) {
-      let count = 0;
-  
-      let initializing = true;
-      const handle = await coll.find({}).observeChangesAsync({
-        added: () => {
-          count += 1;
-          if (!initializing) this.changed('issueUnreadCount', user._id, {count});
-        },
-        removed: () => {
-          count -= 1;
-          this.changed('issueUnreadCount', user._id, {count});
-        }
-      });
+    const publicationName = `publication_${Random.id()}`;
 
-      initializing = false;
+    delete Meteor.server.publish_handlers[publicationName];
 
-      this.added('issueUnreadCount', user._id, {count});
+    Meteor.publish(publicationName, async function (count) {
+      return coll.find({}, { limit: count });
+    });
 
-      // Should be the same as `this.onStop(() => handle.stop())`
-      this.onStop(handle.stop);
+    const reactiveVar = new ReactiveVar(1);
 
-      this.onStop(() => {
-        // If stop is called and breaks for some reason, this will be false
-        test.isTrue(handle._stopped)
-      })
+    const computation = Tracker.autorun(() => {
+      sub = conn.subscribe(publicationName, reactiveVar.get());
+    });
 
-      this.ready();
+    await Meteor._sleepForMs(100);
+
+    reactiveVar.set(2);
+
+    await Meteor._sleepForMs(100);
+
+    const expectedMessages = [
+      "sub",
+      "added",
+      "ready",
+      "sub",
+      "unsub",
+      "added",
+      "ready",
+      "nosub",
+    ];
+
+    /**
+     * There shouldn't ever be `removed` messages here, otherwise the UI will glitch
+     */
+    const parsedMessages = messages.map((m) => m.msg);
+
+    test.equal(parsedMessages, expectedMessages);
+
+    computation.stop();
+
+    cleanup();
+  }
+);
+
+Tinytest.addAsync(
+  "livedata server - stopping a handle should preserve its context on callbacks",
+  async function (test) {
+    const { conn, messages, cleanup } = await captureConnectionMessages(test);
+
+    const coll = new Mongo.Collection("items", {
+      defineMutationMethods: false,
+    });
+
+    for (let i = 0; i < 10; i++) {
+      await coll.removeAsync({ _id: `item_${i}` });
+      await coll.insertAsync({ _id: `item_${i}`, title: `Item #${i}` });
     }
-  });
 
-  // Create multiple competing subscriptions
-  const sub1 = conn.subscribe(publicationName);
-  const sub2 = conn.subscribe(publicationName);
-  const sub3 = conn.subscribe(publicationName);
+    const publicationName = `publication_${Random.id()}`;
 
-  // Make changes that will affect all subs
-  await coll.insertAsync({ _id: 'item_10', title: 'Item #10' });
-  
-  // Stop middle subscription during changes
-  sub2.stop();
-  
-  await coll.insertAsync({ _id: 'item_11', title: 'Item #11' });
-  
-  // Create new subscription while changes happening
-  const sub4 = conn.subscribe(publicationName);
-  
-  await coll.removeAsync({ _id: 'item_10' });
-  
-  sub1.stop();
-  
-  await coll.insertAsync({ _id: 'item_12', title: 'Item #12' });
-  
-  // Final subscription during teardown of others
-  const sub5 = conn.subscribe(publicationName);
-  
-  sub3.stop();
-  sub4.stop();
+    delete Meteor.server.publish_handlers[publicationName];
 
-  await sleep(50);
+    Meteor.publish(publicationName, async function () {
+      const user = {
+        _id: "user_id",
+        customer: "customer_id",
+      };
 
-  sub5.stop();
+      if (user) {
+        let count = 0;
 
-  await sleep(50);
+        let initializing = true;
+        const handle = await coll.find({}).observeChangesAsync({
+          added: () => {
+            count += 1;
+            if (!initializing)
+              this.changed("issueUnreadCount", user._id, { count });
+          },
+          removed: () => {
+            count -= 1;
+            this.changed("issueUnreadCount", user._id, { count });
+          },
+        });
 
-  cleanup();
-});
+        initializing = false;
+
+        this.added("issueUnreadCount", user._id, { count });
+
+        // Should be the same as `this.onStop(() => handle.stop())`
+        this.onStop(handle.stop);
+
+        this.onStop(() => {
+          // If stop is called and breaks for some reason, this will be false
+          test.isTrue(handle._stopped);
+        });
+
+        this.ready();
+      }
+    });
+
+    // Create multiple competing subscriptions
+    const sub1 = conn.subscribe(publicationName);
+    const sub2 = conn.subscribe(publicationName);
+    const sub3 = conn.subscribe(publicationName);
+
+    // Make changes that will affect all subs
+    await coll.insertAsync({ _id: "item_10", title: "Item #10" });
+
+    // Stop middle subscription during changes
+    sub2.stop();
+
+    await coll.insertAsync({ _id: "item_11", title: "Item #11" });
+
+    // Create new subscription while changes happening
+    const sub4 = conn.subscribe(publicationName);
+
+    await coll.removeAsync({ _id: "item_10" });
+
+    sub1.stop();
+
+    await coll.insertAsync({ _id: "item_12", title: "Item #12" });
+
+    // Final subscription during teardown of others
+    const sub5 = conn.subscribe(publicationName);
+
+    sub3.stop();
+    sub4.stop();
+
+    await sleep(50);
+
+    sub5.stop();
+
+    await sleep(50);
+
+    cleanup();
+  }
+);
 
 function getTestConnections(test) {
   return new Promise((resolve, reject) => {
-    makeTestConnection(test, (clientConn, serverConn) => {
-      resolve({ clientConn, serverConn });
-    }, reject);
-  })
+    makeTestConnection(
+      test,
+      (clientConn, serverConn) => {
+        resolve({ clientConn, serverConn });
+      },
+      reject
+    );
+  });
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+Tinytest.addAsync("livedata server - streaming API", async function (test) {
+  const { clientConn, serverConn } = await getTestConnections(test);
+
+  const result = await clientConn.callAsync("livedata_server_test_streaming");
+
+  test.equal(result, "done");
+
+  let current = 0
+  for await (const n of clientConn.stream("livedata_server_test_streaming")) {
+    test.equal(n, ++current);
+  }
+
+
+  clientConn.disconnect();
+});

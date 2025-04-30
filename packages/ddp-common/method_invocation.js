@@ -43,6 +43,8 @@ DDPCommon.MethodInvocation = class MethodInvocation {
     this._unblock = options.unblock || function () {};
     this._calledUnblock = false;
 
+    this._progress = options.progress || function () {};
+
     // used to know when the function apply was called by callAsync
     this._isFromCallAsync = options.isFromCallAsync;
 
@@ -105,5 +107,16 @@ DDPCommon.MethodInvocation = class MethodInvocation {
     }
     this.userId = userId;
     await this._setUserId(userId);
+  }
+
+  /**
+   * @summary Call inside a method invocation.  stream values to the client.
+   * @locus Server
+   * @memberOf DDPCommon.MethodInvocation
+   * @instance
+   * @param {EJSONable} progress The progress value to report.
+   */
+  progress(progress) {
+    this._progress(progress);
   }
 };

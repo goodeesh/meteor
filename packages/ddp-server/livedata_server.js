@@ -562,6 +562,13 @@ Object.assign(Session.prototype, {
         setUserId(userId) {
           return self._setUserId(userId);
         },
+        progress(value){
+          self.send({
+            msg: 'updated',
+            methods: [msg.id],
+            progress: value
+          });
+        },
         unblock: unblock,
         connection: self.connectionHandle,
         randomSeed: randomSeed,
@@ -1361,7 +1368,7 @@ Object.assign(Server.prototype, {
    */
   setPublicationStrategy(collectionName, strategy) {
     if (!Object.values(publicationStrategies).includes(strategy)) {
-      throw new Error(`Invalid merge strategy: ${strategy} 
+      throw new Error(`Invalid merge strategy: ${strategy}
         for collection ${collectionName}`);
     }
     this._publicationStrategies[collectionName] = strategy;
