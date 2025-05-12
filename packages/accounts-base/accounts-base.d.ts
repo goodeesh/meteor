@@ -204,26 +204,34 @@ export namespace Accounts {
     options?: { fields?: Mongo.FieldSpecifier | undefined }
   ): Promise<Meteor.User | null | undefined>;
 
+  interface SendEmailResult {
+    email: string;
+    user: any;
+    token: string;
+    url: string;
+    options: any;
+  }
+
   function sendEnrollmentEmail(
     userId: string,
     email?: string,
     extraTokenData?: Record<string, unknown>,
     extraParams?: Record<string, unknown>
-  ): Promise<void>;
+  ): Promise<SendEmailResult>;
 
   function sendResetPasswordEmail(
     userId: string,
     email?: string,
     extraTokenData?: Record<string, unknown>,
     extraParams?: Record<string, unknown>
-  ): Promise<void>;
+  ): Promise<SendEmailResult>;
 
   function sendVerificationEmail(
     userId: string,
     email?: string,
     extraTokenData?: Record<string, unknown>,
     extraParams?: Record<string, unknown>
-  ): Promise<void>;
+  ): Promise<SendEmailResult>;
 
   function setUsername(userId: string, newUsername: string): Promise<void>;
 
