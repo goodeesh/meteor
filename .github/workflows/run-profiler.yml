@@ -6,7 +6,7 @@ on:
 
 jobs:
   run-profiler:
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/profile')
+    if: ${{ github.event.issue.pull_request }} && contains(${{ github.event.comment.body }}, '/profile')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,3 +20,10 @@ jobs:
           echo "Running meteor profiler..."
           ls
           # Add your CI commands here
+
+      - name: Comment PR
+        uses: thollander/actions-comment-pull-request@v3
+        with:
+          message: |
+            Hello world ! :wave:
+          pr-number: ${{ github.event.issue.number }}
