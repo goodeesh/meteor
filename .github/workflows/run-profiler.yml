@@ -25,5 +25,5 @@ jobs:
         uses: thollander/actions-comment-pull-request@v3
         with:
           message: |
-            Hello world ! :wave:
+            Hello world !!!! :wave:
           pr-number: ${{ github.event.issue.number }}
