@@ -1279,7 +1279,7 @@ As your app uses MongoDB the first step is to set up a MongoDB database, Galaxy 
 In any MongoDB provider you will have a MongoDB URL which you must use it. If you use the free option provided by Galaxy, the initial setup is done for you.
 
 Galaxy MongoDB URL will be like this: `mongodb://username:<password>@org-dbname-01.mongodb.galaxy-cloud.io` .
-> You can read more about Galaxy MongoDB [here](https://galaxy-guide.meteor.com/galaxy-database-mongodb-general) and general MongoDB set up [here](https://galaxy-guide.meteor.com/mongodb.html).
+> You can read more about Galaxy MongoDB [here](https://galaxy-support.meteor.com/en/article/mongodb-general-1syd5af/).
 
 
 ### 8.3: Set up settings
@@ -1312,7 +1312,7 @@ You also need to choose a subdomain to publish your app. We are going to use the
 In this example we are going to use `vue3-meteor-3.meteorapp.com` but make sure you select a different one, otherwise you are going to receive an error.
 
 
-> You can learn how to use custom domains on Galaxy [here](https://galaxy-guide.meteor.com/custom-domains.html). Custom domains are available starting with the Essentials plan.
+> You can learn how to use custom domains on Galaxy [here](https://galaxy-support.meteor.com/en/article/domains-16cijgc/). Custom domains are available starting with the Essentials plan.
 
 
 Run the deployment command:
@@ -1343,7 +1343,7 @@ For details, visit https://galaxy.meteor.com/app/vue3-meteor-3.meteorapp.com
 
 This process usually takes just a few minutes, but it depends on your internet speed as it’s going to send your app bundle to Galaxy servers.
 
-> Galaxy builds a new Docker image that contains your app bundle and then deploy containers using it, [read more](https://galaxy-guide.meteor.com/container-environment.html).
+> Galaxy builds a new Docker image that contains your app bundle and then deploy containers using it, [read more](https://galaxy-support.meteor.com/en/article/container-environment-lfd6kh/).
 
 You can check your logs on Galaxy, including the part that Galaxy is building your Docker image and deploying it.
 
@@ -1356,7 +1356,7 @@ You can also access your app on Galaxy 2.0 which is currently in beta at `https:
 
 You can access the app at [vue3-meteor-3.meteorapp.com](https://vue3-meteor-3.meteorapp.com/)! Just use your subdomain to access yours!
 
-> We deployed to Galaxy running in the US (us-east-1), we also have Galaxy running in other regions in the world, check the list [here](https://galaxy-guide.meteor.com/deploy-region.html).
+> We deployed to Galaxy running in the US (us-east-1), we also have Galaxy running in other regions in the world, check the list [here](https://galaxy-support.meteor.com/en/article/regions-1vucejm/).
 
 This is huge, you have your app running on Galaxy, ready to be used by anyone in the world!
 
@@ -1373,7 +1373,7 @@ You can find the final version of this app in our [GitHub repository](https://gi
 Here are some options for what you can do next:
 
 - Check out the complete [documentation](https://v3-docs.meteor.com/) to learn more about Meteor 3.
-- Read the [Galaxy Guide](https://galaxy-guide.meteor.com/) to learn more about deploying your app.
+- Read the [Galaxy Guide](https://galaxy-support.meteor.com/en/article/deploy-to-galaxy-18gd6e2/) to learn more about deploying your app.
 - Join our community on the [Meteor Forums](https://forums.meteor.com/) and the [Meteor Lounge on Discord](https://discord.gg/hZkTCaVjmT) to ask questions and share your experiences.
 
 We can't wait to see what you build next!
