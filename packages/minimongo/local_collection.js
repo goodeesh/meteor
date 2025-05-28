@@ -1124,13 +1124,23 @@ LocalCollection._checkSupportedProjection = fields => {
   }
 
   Object.keys(fields).forEach(keyPath => {
-    if (keyPath.split('.').includes('$')) {
+    if (keyPath.split('.').includes('$') && keyPath !== '$getField') {
       throw MinimongoError(
         'Minimongo doesn\'t support $ operator in projections yet.'
       );
     }
 
     const value = fields[keyPath];
+
+    // Support for $getField operator
+    if (typeof value === 'object' && hasOwn.call(value, '$getField')) {
+      if (typeof value.$getField !== 'string') {
+        throw MinimongoError(
+          '$getField requires a string field name'
+        );
+      }
+      return; // $getField is supported, skip other validations
+    }
 
     if (typeof value === 'object' &&
         ['$elemMatch', '$meta', '$slice'].some(key =>
@@ -1160,7 +1170,21 @@ LocalCollection._compileProjection = fields => {
   LocalCollection._checkSupportedProjection(fields);
 
   const _idProjection = fields._id === undefined ? true : fields._id;
-  const details = projectionDetails(fields);
+  
+  // Check for $getField expressions
+  const getFieldExpressions = {};
+  const regularFields = {};
+  
+  Object.keys(fields).forEach(key => {
+    const value = fields[key];
+    if (typeof value === 'object' && hasOwn.call(value, '$getField')) {
+      getFieldExpressions[key] = value.$getField;
+    } else {
+      regularFields[key] = value;
+    }
+  });
+  
+  const details = projectionDetails(regularFields);
 
   // returns transformed doc according to ruleTree
   const transform = (doc, ruleTree) => {
@@ -1196,6 +1220,14 @@ LocalCollection._compileProjection = fields => {
 
   return doc => {
     const result = transform(doc, details.tree);
+
+    // Process $getField expressions
+    Object.keys(getFieldExpressions).forEach(projectionKey => {
+      const fieldName = getFieldExpressions[projectionKey];
+      if (doc && hasOwn.call(doc, fieldName)) {
+        result[projectionKey] = doc[fieldName];
+      }
+    });
 
     if (_idProjection && hasOwn.call(doc, '_id')) {
       result._id = doc._id;
@@ -2275,6 +2307,24 @@ const MODIFIERS = {
     // native javascript numbers (doubles) so far, so we can't support $bit
     throw MinimongoError('$bit is not supported', {field});
   },
+  $setField(target, field, arg) {
+    // $setField allows setting fields with dots and other special characters
+    // Format: { $setField: { field: "field.name", value: newValue } }
+    if (!arg || typeof arg !== 'object') {
+      throw MinimongoError('$setField requires an object with field and value', {field});
+    }
+    
+    if (!hasOwn.call(arg, 'field') || !hasOwn.call(arg, 'value')) {
+      throw MinimongoError('$setField requires both field and value properties', {field});
+    }
+    
+    if (typeof arg.field !== 'string') {
+      throw MinimongoError('$setField field must be a string', {field});
+    }
+    
+    // Set the field directly on the target, allowing dots in field names
+    target[arg.field] = arg.value;
+  },
   $v() {
     // As discussed in https://github.com/meteor/meteor/issues/9623,
     // the `$v` operator is not needed by Meteor, but problems can occur if
@@ -2292,11 +2342,11 @@ const NO_CREATE_MODIFIERS = {
 };
 
 // Make sure field names do not contain Mongo restricted
-// characters ('.', '$', '\0').
+// characters ('$', '\0'). Dots are now allowed as per MongoDB 5.0+.
 // https://docs.mongodb.com/manual/reference/limits/#Restrictions-on-Field-Names
+// https://www.mongodb.com/docs/manual/core/dot-dollar-considerations/
 const invalidCharMsg = {
   $: 'start with \'$\'',
-  '.': 'contain \'.\'',
   '\0': 'contain null bytes'
 };
 
@@ -2312,7 +2362,7 @@ function assertHasValidFieldNames(doc) {
 
 function assertIsValidFieldName(key) {
   let match;
-  if (typeof key === 'string' && (match = key.match(/^\$|\.|\0/))) {
+  if (typeof key === 'string' && (match = key.match(/^\$|\0/))) {
     throw MinimongoError(`Key ${key} must not ${invalidCharMsg[match[0]]}`);
   }
 }
