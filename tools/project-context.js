@@ -502,6 +502,8 @@ Object.assign(ProjectContext.prototype, {
       self.meteorConfig = new MeteorConfig({
         appDirectory: self.projectDir,
       });
+      self.meteorConfig._ensureInitialized();
+
       if (buildmessage.jobHasMessages()) {
         return;
       }
@@ -1808,6 +1810,26 @@ Object.assign(exports.FinishedUpgraders.prototype, {
   }
 });
 
+const DEFAULT_MODERN = {
+  transpiler: true,
+  minifier: true,
+  webArchOnly: true,
+  watcher: true,
+};
+
+export const normalizeModern = (r = false) => Object.fromEntries(
+    Object.entries(DEFAULT_MODERN).map(([k, def]) => [
+      k,
+      r === true
+          ? def
+          : r === false || r?.[k] === false
+              ? false
+              : typeof r?.[k] === 'object'
+                  ? { ...r[k] }
+                  : def,
+    ]),
+);
+
 export class MeteorConfig {
   constructor({
     appDirectory,
@@ -1852,7 +1874,13 @@ export class MeteorConfig {
             },
           }),
         } : this._config;
-
+    const modernForced = JSON.parse(process.env.METEOR_MODERN || "false");
+    // Reinitialize meteorConfig globally for project context
+    // Updates config when package.json changes trigger rebuilds
+    global.meteorConfig = {
+      ...(this._config || {}),
+      modern: normalizeModern(modernForced || this._config?.modern || false),
+    };
     return this._config;
   }
 

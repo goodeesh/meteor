@@ -261,49 +261,25 @@ export function parseRunTargets(targets) {
   });
 };
 
-const DEFAULT_MODERN = {
-    transpiler: true,
-    webArchOnly: true,
-    watcher: true,
-};
-
-const normalizeModern = (r = false) => Object.fromEntries(
-    Object.entries(DEFAULT_MODERN).map(([k, def]) => [
-        k,
-        r === true
-            ? def
-            : r === false || r?.[k] === false
-                ? false
-                : typeof r?.[k] === 'object'
-                    ? { ...r[k] }
-                    : def,
-    ]),
-);
-
-
-let modernForced = JSON.parse(process.env.METEOR_MODERN || "false");
-let meteorConfig;
-
-function getMeteorConfig(appDir) {
-  if (meteorConfig) return meteorConfig;
-  const packageJsonPath = files.pathJoin(appDir, 'package.json');
-  if (!files.exists(packageJsonPath)) {
-    return false;
+export function getMeteorConfig(appDir) {
+  const modernForced = JSON.parse(process.env.METEOR_MODERN || "false");
+  let packageJson;
+  if (appDir) {
+    const packageJsonPath = files.pathJoin(appDir, 'package.json');
+    if (!files.exists(packageJsonPath)) {
+      global.meteorConfig = {
+        modern: projectContextModule.normalizeModern(modernForced || false),
+      };
+      return global.meteorConfig;
+    }
+    const packageJsonFile = files.readFile(packageJsonPath, 'utf8');
+    packageJson = JSON.parse(packageJsonFile);
   }
-  const packageJsonFile = files.readFile(packageJsonPath, 'utf8');
-  const packageJson = JSON.parse(packageJsonFile);
-  meteorConfig = packageJson?.meteor;
-  return meteorConfig;
-}
-
-function isModernArchsOnlyEnabled(appDir) {
-  const meteorConfig = getMeteorConfig(appDir);
-  return normalizeModern(modernForced || meteorConfig?.modern).webArchOnly !== false;
-}
-
-export function isModernWatcherEnabled(appDir) {
-  const meteorConfig = getMeteorConfig(appDir);
-  return normalizeModern(modernForced || meteorConfig?.modern).watcher !== false;
+  global.meteorConfig = {
+    ...(packageJson?.meteor || {}),
+    modern: projectContextModule.normalizeModern(modernForced || packageJson?.meteor?.modern || false),
+  };
+  return global.meteorConfig;
 }
 
 function filterWebArchs(webArchs, excludeArchsOption, appDir, options) {
@@ -325,7 +301,7 @@ function filterWebArchs(webArchs, excludeArchsOption, appDir, options) {
     if (!isCordovaDev) {
       const excludeArchsOptions = excludeArchsOption ? excludeArchsOption.trim().split(/\s*,\s*/) : [];
       const hasExcludeArchsOptions = (excludeArchsOptions?.length || 0) > 0;
-      const hasModernArchsOnlyEnabled = appDir && isModernArchsOnlyEnabled(appDir);
+      const hasModernArchsOnlyEnabled = appDir && global.meteorConfig?.modern?.webArchOnly !== false;
       if (hasExcludeArchsOptions && hasModernArchsOnlyEnabled) {
         console.warn('modern.webArchOnly and --exclude-archs are both active. If both are set, --exclude-archs takes priority.');
       }

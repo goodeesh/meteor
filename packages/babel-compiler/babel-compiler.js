@@ -25,8 +25,12 @@ var BCp = BabelCompiler.prototype;
 var excludedFileExtensionPattern = /\.(es5|min)\.js$/i;
 var hasOwn = Object.prototype.hasOwnProperty;
 
+function getMeteorConfig() {
+  return global?.meteorConfig || {};
+}
+
 // Check if verbose mode is enabled either in the provided config or in extraFeatures
-BCp.isVerbose = function(config) {
+BCp.isVerbose = function(config = getMeteorConfig()) {
   if (config?.modern?.transpiler?.verbose) {
     return true;
   }
@@ -80,47 +84,13 @@ function compileWithSwc(source, swcOptions = {}, { features }) {
     };
   });
 }
-const DEFAULT_MODERN = {
-  transpiler: true,
-};
 
-const normalizeModern = (r = false) => Object.fromEntries(
-    Object.entries(DEFAULT_MODERN).map(([k, def]) => [
-      k,
-      r === true
-        ? def
-        : r === false || r?.[k] === false
-        ? false
-        : typeof r?.[k] === 'object'
-        ? { ...r[k] }
-        : def,
-    ]),
-);
-
-let modernForced = JSON.parse(process.env.METEOR_MODERN || "false");
-
-let lastModifiedMeteorConfig;
-let lastModifiedMeteorConfigTime;
 BCp.initializeMeteorAppConfig = function () {
-  if (!lastModifiedMeteorConfig && !fs.existsSync(`${getMeteorAppDir()}/package.json`)) {
-    return;
+  const meteorConfig = getMeteorConfig();
+  if (this.isVerbose()) {
+    logConfigBlock('Meteor Config', meteorConfig);
   }
-  const currentLastModifiedConfigTime = fs
-    .statSync(`${getMeteorAppDir()}/package.json`)
-    ?.mtime?.getTime();
-  if (currentLastModifiedConfigTime !== lastModifiedMeteorConfigTime) {
-    lastModifiedMeteorConfigTime = currentLastModifiedConfigTime;
-    lastModifiedMeteorConfig = getMeteorAppPackageJson()?.meteor;
-    lastModifiedMeteorConfig = lastModifiedMeteorConfig != null ? {
-      ...lastModifiedMeteorConfig,
-      modern: normalizeModern(modernForced || lastModifiedMeteorConfig?.modern),
-    } : {};
-
-    if (this.isVerbose(lastModifiedMeteorConfig)) {
-      logConfigBlock('Meteor Config', lastModifiedMeteorConfig);
-    }
-  }
-  return lastModifiedMeteorConfig;
+  return meteorConfig;
 };
 
 let lastModifiedSwcConfig;
@@ -158,7 +128,7 @@ BCp.initializeMeteorAppSwcrc = function () {
     lastModifiedSwcConfigTime = currentLastModifiedConfigTime;
     lastModifiedSwcConfig = getMeteorAppSwcrc(swcFile);
 
-    if (this.isVerbose(lastModifiedMeteorConfig)) {
+    if (this.isVerbose()) {
       logConfigBlock('SWC Config', lastModifiedSwcConfig);
     }
   }
@@ -168,7 +138,7 @@ BCp.initializeMeteorAppSwcrc = function () {
 let lastModifiedSwcLegacyConfig;
 BCp.initializeMeteorAppLegacyConfig = function () {
   const swcLegacyConfig = convertBabelTargetsForSwc(Babel.getMinimumModernBrowserVersions());
-  if (this.isVerbose(lastModifiedMeteorConfig) && !lastModifiedSwcLegacyConfig) {
+  if (this.isVerbose() && !lastModifiedSwcLegacyConfig) {
     logConfigBlock('SWC Legacy Config', swcLegacyConfig);
   }
   lastModifiedSwcLegacyConfig = swcLegacyConfig;
@@ -355,31 +325,31 @@ BCp.processOneFileForTarget = function (inputFile, source) {
         const isPackageCode = packageName != null;
         const isLegacyWebArch = arch.includes('legacy');
 
-        const config = lastModifiedMeteorConfig?.modern?.transpiler;
-        const hasModernTranspiler = config != null && config !== false;
+        const transpConfig = getMeteorConfig()?.modern?.transpiler;
+        const hasModernTranspiler = transpConfig != null && transpConfig !== false;
         const shouldSkipSwc =
           !hasModernTranspiler ||
-          (isAppCode && config?.excludeApp === true) ||
-          (isNodeModulesCode && config?.excludeNodeModules === true) ||
-          (isPackageCode && config?.excludePackages === true) ||
-          (isLegacyWebArch && config?.excludeLegacy === true) ||
+          (isAppCode && transpConfig?.excludeApp === true) ||
+          (isNodeModulesCode && transpConfig?.excludeNodeModules === true) ||
+          (isPackageCode && transpConfig?.excludePackages === true) ||
+          (isLegacyWebArch && transpConfig?.excludeLegacy === true) ||
           (isAppCode &&
-            Array.isArray(config?.excludeApp) &&
-            isExcludedConfig(inputFilePath, config?.excludeApp || [])) ||
+            Array.isArray(transpConfig?.excludeApp) &&
+            isExcludedConfig(inputFilePath, transpConfig?.excludeApp || [])) ||
           (isNodeModulesCode &&
-            Array.isArray(config?.excludeNodeModules) &&
-            (isExcludedConfig(inputFilePath, config?.excludeNodeModules || []) ||
+            Array.isArray(transpConfig?.excludeNodeModules) &&
+            (isExcludedConfig(inputFilePath, transpConfig?.excludeNodeModules || []) ||
               isExcludedConfig(
                 inputFilePath.replace('node_modules/', ''),
-                config?.excludeNodeModules || [],
+                transpConfig?.excludeNodeModules || [],
                 true,
               ))) ||
           (isPackageCode &&
-            Array.isArray(config?.excludePackages) &&
-            (isExcludedConfig(packageName, config?.excludePackages || []) ||
+            Array.isArray(transpConfig?.excludePackages) &&
+            (isExcludedConfig(packageName, transpConfig?.excludePackages || []) ||
               isExcludedConfig(
                 `${packageName}/${inputFilePath}`,
-                config?.excludePackages || [],
+                transpConfig?.excludePackages || [],
               )));
 
         const cacheKey = [
@@ -402,7 +372,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
             compilation = this.readFromSwcCache({ cacheKey });
             // Return cached result if found.
             if (compilation) {
-              if (this.isVerbose(config)) {
+              if (this.isVerbose()) {
                 logTranspilation({
                   usedSwc: true,
                   inputFilePath,
@@ -432,7 +402,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
             usedSwc = false;
           }
 
-          if (this.isVerbose(config)) {
+          if (this.isVerbose()) {
             logTranspilation({
               usedSwc,
               inputFilePath,
@@ -448,7 +418,7 @@ BCp.processOneFileForTarget = function (inputFile, source) {
 
           babelOptions = setupBabelOptions();
           compilation = compileWithBabel(source, babelOptions, cacheOptions);
-          if (this.isVerbose(config)) {
+          if (this.isVerbose()) {
             logTranspilation({
               usedSwc: false,
               inputFilePath,
