@@ -8,6 +8,8 @@ import { replaceMongoAtomWithMeteor, replaceTypes } from './mongo_common';
  * This is an internal implementation detail and is created lazily by the main Cursor class.
  */
 export class AsynchronousCursor {
+  _closing = false;
+  _pendingNext = null;
   constructor(dbCursor, cursorDescription, options) {
     this._dbCursor = dbCursor;
     this._cursorDescription = cursorDescription;
@@ -36,9 +38,17 @@ export class AsynchronousCursor {
   // Returns a Promise for the next object from the underlying cursor (before
   // the Mongo->Meteor type replacement).
   async _rawNextObjectPromise() {
+    if (this._closing) {
+      // Prevent next() after close is called
+      return null;
+    }
     try {
-      return this._dbCursor.next();
+      this._pendingNext = this._dbCursor.next();
+      const result = await this._pendingNext;
+      this._pendingNext = null;
+      return result;
     } catch (e) {
+      this._pendingNext = null;
       console.error(e);
     }
   }
@@ -73,7 +83,7 @@ export class AsynchronousCursor {
   // Returns a promise which is resolved with the next object (like with
   // _nextObjectPromise) or rejected if the cursor doesn't return within
   // timeoutMS ms.
-  _nextObjectPromiseWithTimeout(timeoutMS) {
+  async _nextObjectPromiseWithTimeout(timeoutMS) {
     if (!timeoutMS) {
       return this._nextObjectPromise();
     }
@@ -84,12 +94,11 @@ export class AsynchronousCursor {
         reject(timeoutErr);
       }, timeoutMS);
     });
-    return Promise.race([nextObjectPromise, timeoutPromise])
-      .catch((err) => {
+      return Promise.race([nextObjectPromise, timeoutPromise]).catch(async err => {
         if (err === timeoutErr) {
-          this.close();
-          return;
+          return this.close();
         }
+        // If the error is not a timeout, rethrow it.
         throw err;
       });
   }
@@ -123,8 +132,19 @@ export class AsynchronousCursor {
   }
 
   // Mostly usable for tailable cursors.
-  close() {
-    this._dbCursor.close();
+  async close() {
+    this._closing = true;
+    // If there's a pending next(), wait for it to finish or abort
+    if (this._pendingNext) {
+      try {
+        await this._pendingNext;
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (this._dbCursor && typeof this._dbCursor.close === 'function') {
+      await this._dbCursor.close();
+    }
   }
 
   fetch() {
