@@ -792,9 +792,9 @@ MongoConnection.prototype.tail = function (cursorDescription, docCallback, timeo
   });
 
   return {
-    stop: function () {
+    stop: async function () {
       stopped = true;
-      cursor.close();
+      await cursor.close();
     }
   };
 };
