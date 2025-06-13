@@ -934,124 +934,482 @@ For now, you cannot run this while a development server is running. Quit all run
 :::
 
 
-## meteor build {meteorbuild}
+## meteor build {#meteorbuild}
 
-Package this project up for deployment. The output is a directory with several
-build artifacts:
+Package your project for deployment.
 
-<ul><li>a tarball (.tar.gz) that includes everything necessary to run the application
-  server (see the <code>README</code> in the tarball for details).  Using the
-  `--directory` option will produce a `bundle` directory instead of the tarball.</li>
-<li>an unsigned <code>apk</code> bundle and a project source if Android is targeted as a
-  mobile platform</li>
-<li>a directory with an Xcode project source if iOS is targeted as a mobile
-  platform</li></ul>
-
-You can use the application server bundle to host a Meteor application on your
-own server, instead of deploying to Galaxy.  You will have to deal
-with logging, monitoring, backups, load-balancing, etc, all of which we handle
-for you if you use Galaxy.
-
-The unsigned `apk` bundle and the outputted Xcode project can be used to deploy
-your mobile apps to Android Play Store and Apple App Store.
-
-By default, your application is bundled for your current architecture.
-This may cause difficulties if your app contains binary code due to,
-for example, npm packages. You can try to override that behavior
-with the `--architecture` flag.
-
-You can set optional data for the initial value of `Meteor.settings`
-in your mobile application with the `--mobile-settings` flag. A new value for
-`Meteor.settings` can be set later by the server as part of hot code push.
-
-You can also specify which platforms you want to build with the `--platforms` flag.
-Examples: `--platforms=android`, `--platforms=ios`, `--platforms=web.browser`.
-
-## meteor lint {meteorlint}
-
-Run through the whole build process for the app and run all linters the app
-uses. Outputs all build errors or linting warnings to the standard output.
-
-
-## meteor search {meteorsearch}
-
-Searches for Meteor packages and releases, whose names contain the specified
-regular expression.
-
-
-## meteor show {meteorshow}
-
-Shows more information about a specific package or release: name, summary, the
-usernames of its maintainers, and, if specified, its homepage and git URL.
-
-Get information on meteor recommended releases:
 ```bash
+meteor build <output-path> [options]
+```
+
+### Output Artifacts
+
+The command produces deployment-ready artifacts for all platforms in your project:
+
+- **Server Bundle**: A tarball containing everything needed to run the application server
+- **Android Package**: AAB/APK bundle and Android project source (if Android platform is added)
+- **iOS Package**: Xcode project source (if iOS platform is added)
+
+::: tip Self-Hosting
+You can use the server bundle to host a Meteor application on your own infrastructure instead of Galaxy. Note that you'll need to handle logging, monitoring, backups, and load-balancing yourself.
+:::
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--debug` | Build in debug mode (don't minify, preserve source maps) |
+| `--directory` | Output a directory instead of a tarball (existing output location will be deleted first) |
+| `--server-only` | Skip building mobile apps but still build the 'web.cordova' client target for hot code push |
+| `--mobile-settings <file>` | Set the initial value of `Meteor.settings` in mobile apps |
+| `--server <url>` | Location where mobile builds connect to the Meteor server (defaults to localhost:3000) |
+| `--architecture <arch>` | Build for a different architecture than your development machine |
+| `--allow-incompatible-update` | Allow packages to be upgraded/downgraded to potentially incompatible versions |
+| `--platforms <platforms>` | Build only for specified platforms (when available) |
+| `--packageType <type>` | Choose between `apk` or `bundle` for Android builds (defaults to `bundle`) |
+
+::: details Available Architectures
+Valid architectures include:
+- `os.osx.x86_64`
+- `os.linux.x86_64`
+- `os.linux.x86_32`
+- `os.windows.x86_32`
+- `os.windows.x86_64`
+
+This option selects the architecture of binary-dependent Atmosphere packages. If your project doesn't use Atmosphere packages with binary dependencies, `--architecture` has no effect.
+:::
+
+### Examples
+
+```bash
+# Basic build
+meteor build ../build
+
+# Output a directory instead of a tarball
+meteor build ../build --directory
+
+# Debug build (unminified)
+meteor build ../build --debug
+
+# Build only the server (skip mobile apps)
+meteor build ../build --server-only
+
+# Build for specific platforms
+meteor build ../build --platforms=android,ios
+
+# Set server location for mobile apps
+meteor build ../build --server=https://example.com:443
+
+# Build for a different architecture
+meteor build ../build --architecture=os.linux.x86_64
+
+# Specify Android package type
+meteor build ../build --packageType=apk
+```
+
+## meteor lint {#meteorlint}
+
+Run linters on your Meteor application code.
+
+```bash
+meteor lint [options]
+```
+
+### Description
+
+This command:
+- Performs a complete build of your application
+- Runs all configured linters
+- Outputs build errors and linting warnings to standard output
+
+::: tip CI Integration
+The `meteor lint` command is particularly useful for continuous integration environments to catch code quality issues before deployment.
+:::
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--allow-incompatible-update` | Allow packages to be upgraded or downgraded to potentially incompatible versions if required to satisfy all package version constraints |
+
+### Example Usage
+
+```bash
+# Basic usage
+meteor lint
+
+# Allow incompatible package updates during linting
+meteor lint --allow-incompatible-update
+```
+
+::: warning
+Linting errors will prevent your application from being built successfully. Fixing these errors is required for deployment.
+:::
+
+
+## meteor search {#meteorsearch}
+
+Search for Meteor packages and releases.
+
+```bash
+meteor search <regex> [options]
+```
+
+### Description
+
+Searches through the Meteor package and release database for items whose names match the specified regular expression.
+
+::: info Default Behavior
+By default, the search will not show:
+- Packages without official versions (e.g., those with only prereleases)
+- Packages known to be incompatible with Meteor 0.9.0 and later due to migration issues
+:::
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--maintainer <username>` | Filter results by authorized maintainer |
+| `--show-all` | Show all matches, including prereleases and incompatible packages |
+| `--ejson` | Display more detailed output in EJSON format |
+
+### Examples
+
+```bash
+# Search for all packages related to "auth"
+meteor search auth
+
+# Search for packages maintained by a specific user
+meteor search mongo --maintainer meteor
+
+# Show all matching packages, including prereleases
+meteor search bootstrap --show-all
+
+# Get detailed output in EJSON format
+meteor search react --ejson
+```
+
+::: tip Advanced Searching
+You can use regular expressions for more powerful searches:
+```bash
+# Packages that start with "react-"
+meteor search "^react-"
+
+# Packages that end with "router"
+meteor search "router$"
+```
+:::
+
+
+## meteor show {#meteorshow}
+
+Display detailed information about packages and releases.
+
+```bash
+meteor show <name> [options]
+meteor show <name@version> [options]
+meteor show [options]
+```
+
+### Description
+
+Shows detailed information about a specific package or release, including:
+- Name and summary
+- Available versions
+- Maintainers
+- Homepage and git URL (if specified)
+- Exports and other package metadata
+
+::: tip
+This works on both local packages built from source and remote packages stored on the server.
+:::
+
+### Common Usage
+
+#### View Package Information
+
+```bash
+# Show information about a package
+meteor show jam:easy-schema
+
+# Show information about a specific version
+meteor show jam:easy-schema@1.7.0
+
+# Show information about the local version
+meteor show jam:easy-schema@local
+```
+
+#### View Meteor Releases
+
+```bash
+# Show recommended Meteor releases
 meteor show METEOR
+
+# Show all Meteor releases (including intermediate ones)
+meteor show METEOR --show-all
 ```
 
-Get information on all meteor releases (including intermediate releases)"
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--show-all` | Show hidden versions, experimental releases, and incompatible packages |
+| `--ejson` | Display more detailed output in EJSON format |
+
+### Examples
+
 ```bash
-meteor show --show-all METEOR
+# Running from a package directory shows info for that package
+cd ~/my-package
+meteor show
+
+# View detailed EJSON output
+meteor show react-meteor-data --ejson
+```
+
+::: info Default Behavior
+By default, Meteor:
+- Shows no more than five versions
+- Hides experimental release versions
+- Hides packages incompatible with Meteor 0.9.0 and later
+:::
+
+::: details Version Selection
+For version-specific information (like exports), Meteor will use:
+1. The local version, if available
+2. The latest official version, if no local version exists
+:::
+
+
+## meteor publish {#meteorpublish}
+
+Publish a package to Atmosphere (Meteor package server).
+
+```bash
+meteor publish [options]
+meteor publish --update
+```
+
+### Description
+
+Publishes a new version of a local package to Atmosphere. Must be run from the package directory.
+
+::: warning Package Naming Convention
+Published package names must begin with the maintainer's Meteor Developer Account username and a colon, like `username:package-name`.
+:::
+
+### Common Operations
+
+#### Publish a New Package
+
+```bash
+cd my-package
+meteor publish --create
+```
+
+#### Update an Existing Package
+
+```bash
+cd my-package
+meteor publish
+```
+
+#### Update Package Metadata
+
+Update README, description, or other metadata without changing the code:
+
+```bash
+cd my-package
+meteor publish --update
+```
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--create` | Publish a new package for the first time |
+| `--update` | Update metadata of a previously published version (README, git URL, description, etc.) |
+| `--allow-incompatible-update` | Allow dependencies to be upgraded/downgraded to potentially incompatible versions |
+| `--no-lint` | Skip linting the package and its local dependencies before publishing |
+
+### Architecture-Specific Packages
+
+For packages with binary components:
+- Regular `publish` will only upload the build for your current architecture
+- Use `meteor publish-for-arch` from a different machine to upload builds for other architectures
+
+::: details Package Publication Process
+When you publish a package:
+1. Meteor reads version information from `package.js`
+2. Builds the package
+3. Sends both source code and built version to the package server
+4. Marks you as the sole maintainer (use `meteor admin maintainers` to modify)
+:::
+
+### Examples
+
+```bash
+# Publish a new package
+meteor publish --create
+
+# Update an existing package
+meteor publish
+
+# Update metadata only
+meteor publish --update
+
+# Publish without linting
+meteor publish --no-lint
+```
+
+::: tip
+Use `meteor show` to preview how your package information will appear in the package server.
+:::
+
+## meteor publish-for-arch {#meteorpublishforarch}
+
+Publish architecture-specific builds of a package.
+
+```bash
+meteor publish-for-arch packageName@version
+```
+
+### Description
+
+Creates and publishes a build of an existing package version for a different architecture than the one initially published.
+
+::: info Architecture Support
+Meteor currently supports the following architectures:
+- 32-bit Linux
+- 64-bit Linux (used by Galaxy servers)
+- 64-bit macOS
+:::
+
+### Use Case
+
+When a package contains platform-specific components (like npm modules with native code), running `meteor publish` only creates a build for your current architecture. To make your package usable on other architectures, you need to run `publish-for-arch` from machines with those architectures.
+
+### How It Works
+
+1. Run the command on a machine with the target architecture
+2. Meteor downloads your package's source and dependencies from the package server
+3. Builds the package for the current architecture
+4. Uploads the architecture-specific build to the package server
+
+::: tip No Source Required
+You don't need to have a copy of your package's source code to run this command. Meteor automatically downloads everything needed from the package server.
+:::
+
+### Example Workflow
+
+Imagine you've published a package with binary components from a Mac:
+
+```bash
+# On your Mac
+cd my-binary-package
+meteor publish --create
+```
+
+To make it available for Linux users:
+
+```bash
+# Later, on a 64-bit Linux machine
+meteor publish-for-arch username:my-binary-package@1.0.0
 ```
 
 
-## meteor publish {meteorpublish}
+## meteor publish-release {#meteorpublishrelease}
 
-Publishes your package. To publish, you must `cd` into the package directory, log
-in with your Meteor Developer Account and run `meteor publish`. By convention,
-published package names must begin with the maintainer's Meteor Developer
-Account username and a colon, like so: `iron:router`.
+Publish a new Meteor release.
 
-To publish a package for the first time, use `meteor publish --create`.
+```bash
+meteor publish-release <path-to-json-config> [options]
+```
 
-Sometimes packages may contain binary code specific to an architecture (for
-example, they may use an npm package). In that case, running publish will only
-upload the build to the architecture that you were using to publish it. You can
-use `publish-for-arch` to upload a build to a different architecture from a
-different machine.
+### Description
 
-If you have already published a package but need to update it's metadata
-(the content of `Package.describe`) or the README you can actually achieve this
-via `meteor publish --update`.
+Publishes a new release of Meteor based on a JSON configuration file. This allows you to create custom Meteor releases or release tracks.
 
-## meteor publish-for-arch {meteorpublishforarch}
+::: info Release Tracks
+Meteor releases are divided into tracks:
+- Only Meteor Software can publish to the default Meteor track
+- Anyone can create and publish to their own custom tracks
+- Users won't switch tracks when running `meteor update` unless specified
+:::
 
-Publishes a build of an existing package version from a different architecture.
+### Configuration File Format
 
-Some packages contain code specific to an architecture. Running `publish` by
-itself, will upload the build to the architecture that you were using to
-publish. You need to run `publish-for-arch` from a different architecture to
-upload a different build.
+The JSON configuration file must contain:
 
-For example, let's say you published name:cool-binary-blob from a Mac. If you
-want people to be able to use cool-binary-blob from Linux, you should log into a
-Linux machine and then run
-`meteor publish-for-arch name:cool-binary-blob@version`.  It will notice that you
-are on a linux machine, and that there is no Linux-compatible build for your package
-and publish one.
+```json
+{
+  "track": "TRACK_NAME",          // Release track (e.g., "METEOR")
+  "version": "VERSION",           // Version number (e.g., "2.8.0")
+  "recommended": true|false,      // Is this a recommended release?
+  "description": "DESCRIPTION",   // Brief description of the release
+  "tool": "PACKAGE@VERSION",      // The meteor tool package and version
+  "packages": {                   // Specific package versions for this release
+    "package1": "version",
+    "package2": "version"
+  },
+  "patchFrom": ["VERSION1", "VERSION2"]  // Optional: releases this patches
+}
+```
 
-Currently, the supported architectures for Meteor are 32-bit Linux, 64-bit Linux
-and Mac OS. Galaxy's servers run 64-bit Linux.
+::: warning Prerequisites
+You must publish all package versions to the package server before you can specify them in a release.
+:::
 
+### Options
 
-## meteor publish-release {meteorpublishrelease}
+| Option | Description |
+|--------|-------------|
+| `--create-track` | Create and publish a new release track |
 
-Publishes a release of Meteor. Takes in a JSON configuration file.
+### Recommended Flag
 
-Meteor releases are divided into tracks. While only MDG members can publish to
-the default Meteor track, anyone can create a track of their own and publish to
-it. Running `meteor update` without specifying the `--release` option will not
-cause the user to switch tracks.
+- Set `recommended: true` for stable releases (e.g., METEOR@3.2.2)
+- Set `recommended: false` for release candidates, experimental releases, etc.
 
-To publish to a release track for the first time, use the `--create-track` flag.
+### Patch Releases
 
-The JSON configuration file must contain the name of the release track
-(`track`), the release version (`version`), various metadata, the packages
-specified by the release as mapped to versions (`packages`), and the package &
-version of the Meteor command-line tool (`tool`). Note that this means that
-forks of the meteor tool can be published as packages and people can use them by
-switching to a corresponding release. For more information, run
-`meteor help publish-release`.
+Use the `patchFrom` field to specify a patch release:
+- Lists releases this new release patches
+- Automatically unrecommends the releases specified in `patchFrom`
+
+### Examples
+
+#### Publishing a New Release Track
+
+```bash
+meteor publish-release my-release-config.json --create-track
+```
+
+#### Publishing a New Release
+
+```bash
+meteor publish-release meteor-3.3.0.json
+```
+
+#### Sample Configuration File
+
+```json
+{
+  "track": "MYCORP",
+  "version": "1.0.0",
+  "recommended": true,
+  "description": "MyCompany's custom Meteor release",
+  "tool": "meteor-tool@2.8.0",
+  "packages": {
+    "accounts-base": "2.2.5",
+    "mongo": "1.15.0"
+  }
+}
+```
+
+::: tip Custom Tool Forks
+This system allows forks of the meteor tool to be published as packages, letting users switch to custom tool implementations by changing to the corresponding release.
+:::
 
 
 ## meteor test-packages {meteortestpackages}
