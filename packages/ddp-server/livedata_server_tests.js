@@ -1,3 +1,6 @@
+// Short-circuit the disconnect grace period for tests to avoid timer leaks
+Meteor.server.options.disconnectGracePeriod = 20;
+
 Tinytest.addAsync(
   "livedata server - connectionHandle.onClose()",
   function (test, onComplete) {

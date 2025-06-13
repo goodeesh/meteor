@@ -606,6 +606,7 @@ Object.assign(Session.prototype, {
             name: msg.method,
             connectionId: self.id
           };
+
           DDPRateLimiter._increment(rateLimiterInput);
           var rateLimitResult = DDPRateLimiter._check(rateLimiterInput)
           if (!rateLimitResult.allowed) {
@@ -1587,6 +1588,9 @@ Object.assign(Server.prototype, {
     }
     session.messageQueue = [];
     session._pendingRemoveFunction = sessionRemoveFunction;
+    if (session._removeTimeoutHandle) {
+      Meteor.clearTimeout(session._removeTimeoutHandle);
+    }
     session._removeTimeoutHandle = Meteor.setTimeout(sessionRemoveFunction, self.options.disconnectGracePeriod);
   },
 
