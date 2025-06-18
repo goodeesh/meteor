@@ -805,6 +805,8 @@ Object.assign(MongoConnection.prototype, {
     var self = this;
     const collectionName = cursorDescription.collectionName;
     
+    console.error('🔥 _observeChanges: CALLED with selector:', JSON.stringify(cursorDescription.selector));
+
     if (cursorDescription.options.tailable) {
       return self._observeChangesTailable(cursorDescription, ordered, callbacks);
     }
@@ -880,8 +882,15 @@ Object.assign(MongoConnection.prototype, {
         function () {
           // We need to be able to compile the selector. Fall back to polling for
           // some newfangled $selector that minimongo doesn't support yet.
-          matcher = new Minimongo.Matcher(cursorDescription.selector);
-          return !!matcher;
+          try {
+            matcher = new Minimongo.Matcher(cursorDescription.selector);
+            return !!matcher;
+          } catch (e) {
+            if (e.message && (e.message.includes('needs an array') )) {
+              throw e;
+            }
+            return false;
+          }
         },
         function () {
           // ... and the selector itself needs to support oplog.
