@@ -804,8 +804,6 @@ Object.assign(MongoConnection.prototype, {
     cursorDescription, ordered, callbacks, nonMutatingCallbacks) {
     var self = this;
     const collectionName = cursorDescription.collectionName;
-    
-    console.error('🔥 _observeChanges: CALLED with selector:', JSON.stringify(cursorDescription.selector));
 
     if (cursorDescription.options.tailable) {
       return self._observeChangesTailable(cursorDescription, ordered, callbacks);
