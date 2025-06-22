@@ -92,11 +92,11 @@ Or exclude only specific files like `.jsx`:
 }
 ```
 
-You can also use `excludePackages`, `excludeNodeModules`, and `excludeLegacy` for finer control. See the [`modernTranspiler` config docs](#config-api) for more.
+You can also use `excludePackages`, `excludeNodeModules`, and `excludeLegacy` for finer control. See the [`modern.transpiler` config docs](#config-api) for more.
 
 When no plugin exists, these settings let you still get most of SWC’s speed benefits by limiting fallback use.
 
-Most apps will benefit just by enabling `modernTranspiler: true`. Most Meteor packages should work right away, except ones using nested imports. Node modules will mostly work too, since they follow common standards. Most app code should also work unless it depends on Babel-specific behavior.
+Most apps will benefit just by enabling `modern: true`. Most Meteor packages should work right away, except ones using nested imports. Node modules will mostly work too, since they follow common standards. Most app code should also work unless it depends on Babel-specific behavior.
 
 > Remember to turn off verbosity when you're done with optimizations.
 
@@ -110,7 +110,7 @@ You can also configure other options using the `.swcrc` format. One common case 
 {
   "jsc": {
     "parser": {
-      "syntax": "emcascript",
+      "syntax": "ecmascript",
       "jsx": true
     }
   }
@@ -120,6 +120,10 @@ You can also configure other options using the `.swcrc` format. One common case 
 > You can also configure it for TypeScript, make sure to set `"syntax": "typescript"` and `"tsx": true` instead.
 
 This overrides Meteor's internal SWC config to apply your settings, ensuring SWC processes `.js` or `.ts` files with React components without falling back to Babel.
+
+Use `swc.config.js` in your project root for dynamic configuration. Meteor will import and apply the SWC config automatically. This lets you choose a config based on environment variables or other runtime factors.
+
+Explore additional custom SWC configs, including ["Import Aliases"](#import-aliases) and ["React Runtime"](#react-runtime).
 
 ## Config API
 
@@ -192,6 +196,62 @@ To use the same aliases in SWC, add them to your [.swcrc](#custom-swcrc):
 
 This enables you to use `@ui/components` instead of `./ui/components` in your imports.
 
+You can use `swc.config.js` to define different aliases based on an environment variable.
+
+``` js
+var mode = process.env.MODE_ENV;
+
+var userAliases = {
+  "@ui/*": ["user/*"],
+};
+
+var adminAliases = {
+  "@ui/*": ["admin/*"],
+};
+
+module.exports = {
+    jsc: {
+        baseUrl: "./",
+        paths: mode === "USER" ? userAliases : adminAliases,
+    },
+};
+```
+
+:::warning
+SWC only resolves aliases to imports, not `require` calls.
+:::
+
+- Imports
+
+Binding imports inject a module to use.
+
+``` javascript
+// Binding imports
+import Button from "@ui/button";
+import { Button } from "@ui/button";
+```
+
+Side-effect imports run the module’s code.
+
+``` javascript
+// Side effect import
+import "@ui/button";
+```
+
+- Require calls
+
+Can import values or run the module’s code.
+
+``` javascript
+const { Button } = require("@ui/button");
+
+require("@ui/button");
+```
+
+SWC resolve aliases for imports correctly, but require calls won’t. For require calls, use an import or a relative path.
+
+SWC has no [module-resolver plugin like Babel’s](https://www.npmjs.com/package/babel-plugin-module-resolver) yet, which could affect require calls in the future.
+
 ### React Runtime
 
 Meteor Babel lets you skip importing React in your files by using the [`@babel/plugin-transform-react-jsx`](https://www.npmjs.com/package/@babel/plugin-transform-react-jsx) runtime config.
@@ -216,6 +276,6 @@ If you run into issues, try `meteor reset` or delete the `.meteor/local` folder 
 
 For help or to report issues, post on [GitHub](https://github.com/meteor/meteor/issues) or the [Meteor forums](https://forums.meteor.com). We’re focused on making Meteor faster and your feedback helps.
 
-You can compare performance before and after enabling `modernTranspiler` by running [`meteor profile`](../../cli/index.md#meteorprofile). Share your results to show progress to others.
+You can compare performance before and after enabling `modern` by running [`meteor profile`](../../cli/index.md#meteorprofile). Share your results to show progress to others.
 
 > **[Check out modern bundler options](bundler.md) to improve performance and access newer build features.**

@@ -34,6 +34,16 @@ By default, `"modern": true` enables all build stack upgrades. To opt out of web
 }
 ```
 
+This setting doesn’t affect production; legacy builds are still included by default on Meteor apps.
+
+To exclude legacy builds in production, add "modern" to the `.meteor/platforms` file.
+
+```sh
+server
+browser
+modern
+```
+
 ## Minifier
 
 :::info

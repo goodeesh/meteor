@@ -59,7 +59,7 @@ selftest.define("modern build stack", async function () {
   await s.cd("modern");
 
   s.set("METEOR_PROFILE", "0");
-  
+
   await writeModernConfig(s, true);
 
   const run = s.run();
@@ -204,6 +204,11 @@ selftest.define("modern build stack - transpiler boolean-like options", async fu
   run.waitSecs(waitToStart);
   await run.match("App running at");
 
+  /* check verbose logs */
+  await run.match(/SWC Config/, false, true);
+  await run.match(/SWC Legacy Config/, false, true);
+  await run.match(/Meteor Config/, false, true);
+
   /* check transpiler options */
   await run.match(/\[Transpiler] Used SWC.*\(app\)/, false, true);
   await run.match(/\[Transpiler] Used SWC.*\(package\)/, false, true);
@@ -252,6 +257,11 @@ selftest.define("modern build stack - transpiler string-like options", async fun
   run.waitSecs(waitToStart);
   await run.match("App running at");
 
+  /* check verbose logs */
+  await run.match(/SWC Config/, false, true);
+  await run.match(/SWC Legacy Config/, false, true);
+  await run.match(/Meteor Config/, false, true);
+
   /* check transpiler options */
   await run.match(/\[Transpiler] Used SWC.*\(app\)/, false, true);
   await run.match(/\[Transpiler] Used SWC.*\(package\)/, false, true);
@@ -297,6 +307,12 @@ async function writeSwcrcConfig(s, config) {
   s.write(".swcrc", JSON.stringify(json, null, 2) + "\n");
 }
 
+async function writeSwcConfigJs(s, config) {
+  // Create a JavaScript file that exports the configuration
+  const jsContent = `module.exports = ${JSON.stringify(config, null, 2)};`;
+  s.write("swc.config.js", jsContent);
+}
+
 selftest.define("modern build stack - transpiler custom .swcrc", async function () {
   const currentMeteorModern = process.env.METEOR_MODERN;
   process.env.METEOR_MODERN = '';
@@ -321,6 +337,50 @@ selftest.define("modern build stack - transpiler custom .swcrc", async function 
   await run.match("App running at");
 
   /* custom .swcrc and alias resolution */
+  await run.match(/alias resolved/, false, true);
+
+  await run.stop();
+
+  process.env.METEOR_MODERN = currentMeteorModern;
+});
+
+selftest.define("modern build stack - transpiler custom swc.config.js", async function () {
+  const currentMeteorModern = process.env.METEOR_MODERN;
+  process.env.METEOR_MODERN = '';
+
+  const s = new Sandbox();
+  await s.init();
+
+  await s.createApp("modern", "modern");
+  await s.cd("modern");
+
+  // Remove the .swcrc file to ensure we're using swc.config.js
+  s.unlink(".swcrc");
+
+  // Write the swc.config.js file with the same configuration
+  await writeSwcConfigJs(s, {
+    jsc: {
+      baseUrl: "./",
+      paths: {
+        "@swcAlias/*": ["swcAlias/*"]
+      }
+    }
+  });
+
+  await writeConfig(s, {
+    modern: true,
+    mainModule: {
+      client: 'client/main.js',
+      server: 'server/alias.js',
+    },
+  });
+
+  const run = s.run();
+
+  run.waitSecs(waitToStart);
+  await run.match("App running at");
+
+  /* custom swc.config.js and alias resolution */
   await run.match(/alias resolved/, false, true);
 
   await run.stop();
@@ -442,7 +502,7 @@ selftest.define("modern build stack - test swc minifier", async function () {
 
   await s.createApp(appName, "modern");
   await s.cd(appName);
-  
+
   await writeConfig(s, {
     modern: true,
     mainModule: {
@@ -452,7 +512,7 @@ selftest.define("modern build stack - test swc minifier", async function () {
   });
 
   s.set("NODE_INSPECTOR_IPC", "1");
-  
+
   await writeModernConfig(s, {
     minifier: true
   });

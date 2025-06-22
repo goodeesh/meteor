@@ -301,6 +301,9 @@ async function ensureWatchRoot(dirPath: string): Promise<void> {
         osDirPath,
         (err, events) => {
           if (err) {
+            if (/Events were dropped/.test(err.message)) {
+              return;
+            }
             console.error(`Parcel watcher error on ${osDirPath}:`, err);
             // Only disable native watching for critical errors (like ENOSPC).
             // @ts-ignore
