@@ -11,7 +11,6 @@ import {
   validateCollectionName
 } from './collection_utils';
 import { ReplicationMethods } from './methods_replication';
-import { watch } from './watch_change_stream';
 
 /**
  * @summary Namespace for MongoDB-related items
@@ -348,6 +347,4 @@ Meteor.Collection = Mongo.Collection;
 
 // Allow deny stuff is now in the allow-deny package
 Object.assign(Mongo.Collection.prototype, AllowDeny.CollectionPrototype);
-
-Object.assign(Mongo.Collection.prototype, { watch });
 
