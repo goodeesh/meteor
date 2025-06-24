@@ -45,6 +45,7 @@
 ### [callback-hook](https://github.com/meteor/meteor/tree/devel/packages/callback-hook) {#callback-hook}
 ### [check](https://github.com/meteor/meteor/tree/devel/packages/check) {#check}
 ### [constraint-solver](https://github.com/meteor/meteor/tree/devel/packages/constraint-solver) {#constraint-solver}
+### [context](https://github.com/meteor/meteor/tree/devel/packages/context) {#context}
 ### [core-runtime](https://github.com/meteor/meteor/tree/devel/packages/core-runtime) {#core-runtime}
 ### [crosswalk](https://github.com/meteor/meteor/tree/devel/packages/crosswalk) {#crosswalk}
 ### [ddp](https://github.com/meteor/meteor/tree/devel/packages/ddp) {#ddp}
@@ -81,6 +82,7 @@
 ### [id-map](https://github.com/meteor/meteor/tree/devel/packages/id-map) {#id-map}
 ### [insecure](https://github.com/meteor/meteor/tree/devel/packages/insecure) {#insecure}
 ### [inter-process-messaging](https://github.com/meteor/meteor/tree/devel/packages/inter-process-messaging) {#inter-process-messaging}
+### [jshint](https://github.com/meteor/meteor/tree/devel/packages/jshint) {#jshint}
 ### [launch-screen](https://github.com/meteor/meteor/tree/devel/packages/launch-screen) {#launch-screen}
 ### [localstorage](https://github.com/meteor/meteor/tree/devel/packages/localstorage) {#localstorage}
 ### [logging](https://github.com/meteor/meteor/tree/devel/packages/logging) {#logging}
@@ -105,6 +107,7 @@
 ### [mongo-dev-server](https://github.com/meteor/meteor/tree/devel/packages/mongo-dev-server) {#mongo-dev-server}
 ### [mongo-id](https://github.com/meteor/meteor/tree/devel/packages/mongo-id) {#mongo-id}
 ### [mongo-livedata](https://github.com/meteor/meteor/tree/devel/packages/mongo-livedata) {#mongo-livedata}
+### [npm-bcrypt](https://github.com/meteor/meteor/tree/devel/packages/npm-bcrypt) {#npm-bcrypt}
 ### [npm-mongo](https://github.com/meteor/meteor/tree/devel/packages/npm-mongo) {#npm-mongo}
 ### [oauth](https://github.com/meteor/meteor/tree/devel/packages/oauth) {#oauth}
 ### [oauth-encryption](https://github.com/meteor/meteor/tree/devel/packages/oauth-encryption) {#oauth-encryption}

@@ -298,7 +298,7 @@ Object.assign(Session.prototype, {
       self.socket.close();
       self.socket._meteorSession = null;
     }
-    
+
     self.server._removeSession(self, () => {
       Package['facts-base'] && Package['facts-base'].Facts.incrementServerFact(
         "livedata", "sessions", -1);
@@ -1277,10 +1277,18 @@ Server = function (options = {}) {
     // For testing, allow responding to pings to be disabled.
     respondToPings: true,
     defaultPublicationStrategy: publicationStrategies.SERVER_MERGE,
-    // how many messages should we queue during a non-graceful disconnect before we kill the session (to insure against memory leaks)
+    /**
+     * @summary How many messages should we queue during a non-graceful disconnect before we kill the session (to insure against memory leaks).
+     * @type {Number}
+     * @locus Server
+     */
     maxMessageQueueLength: 100,
-    // how long we should maintain a session for after a non-graceful disconnect before killing it
-    // sessions that reconnect within this time will be resumed with minimal performance impact.
+    /**
+     * @summary How long we should maintain a session for after a non-graceful disconnect before killing it
+     *          sessions that reconnect within this time will be resumed with minimal performance impact.
+     * @type {Number}
+     * @locus Server
+     */
     disconnectGracePeriod: 15000,
     ...options,
   };

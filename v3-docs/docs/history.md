@@ -10,6 +10,8 @@ This is a complete history of changes for Meteor releases.
 
 [//]: # (go to meteor/docs/generators/changelog/docs)
 
+
+
 ## v3.3.0, 2025-06-11
 
 ### Highlights
@@ -122,7 +124,6 @@ If you find any issues, please report them to the [Meteor issues tracker](https:
 - [@StorytellerCZ](https://github.com/StorytellerCZ)
 
 ✨✨✨ 
-
 ## v3.2.2, 2025-05-02
 
 ### Highlights
@@ -147,7 +148,7 @@ Please run the following command to update your project:
 
 ```bash
 
-meteor update --release 3.2.1
+meteor update --release 3.2.2
 
 ```
 
@@ -721,6 +722,7 @@ For making this great framework even better!
   - `Accounts.sendVerificationEmail`
   - `Accounts.addEmail`
   - `Accounts.removeEmail`
+  - `Accounts.replaceEmailAsync`
   - `Accounts.verifyEmail`
   - `Accounts.createUserVerifyingEmail`
   - `Accounts.createUser`
