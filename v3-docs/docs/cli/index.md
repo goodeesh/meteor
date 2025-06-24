@@ -175,13 +175,15 @@ This command monitors the bundler process and tracks key performance metrics to 
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--size` | Monitor both bundle runtime and size |
-| `--size-only` | Monitor only the bundle size |
+| Option        | Description                          |
+|---------------|--------------------------------------|
+| `--size`      | Monitor both bundle runtime and size |
+| `--size-only` | Monitor only the bundle size         |
+| `--build`     | Monitor build time                   |
 
 ::: info
 All other options from `meteor run` are also supported (e.g., `--settings`, `--exclude-archs`).
+If you use the --build option, it also accepts meteor build flags (e.g. `--mobile-settings`, `--architecture`).
 :::
 
 ### Environment Variables
@@ -206,6 +208,9 @@ meteor profile
 # Monitor bundle size only
 meteor profile --size-only
 
+# Monitor build time
+meteor profile --build
+
 # Profile with custom settings and timeout
 METEOR_IDLE_TIMEOUT=120 meteor profile --settings settings.json
 
@@ -214,7 +219,7 @@ METEOR_CLIENT_ENTRYPOINT=client/main.js METEOR_SERVER_ENTRYPOINT=server/main.js 
 ```
 
 ::: details Customizing the Profiling Process
-You can pass any option that works with `meteor run` to customize the profiling process. This allows you to profile your application under specific conditions that match your deployment environment.
+You can pass any option that works with `meteor run` to customize the profiling process. This allows you to profile your application under specific conditions that match your deployment environment. The same applies to the `--build` option, which matches `meteor build` options.
 :::
 
 ## meteor create _app-name_ {#meteorcreate}
@@ -1434,18 +1439,19 @@ If no packages are specified, all available packages will be tested.
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--port`, `-p <port>` | Port to listen on (default: 3000). Also uses ports N+1 and N+2 |
-| `--open`, `-o` | Opens a browser window when the app starts |
-| `--inspect[-brk][=<port>]` | Enable server-side debugging (default port: 9229) |
-| `--settings`, `-s <file>` | Set optional data for Meteor.settings on the server |
-| `--production` | Simulate production mode (minify and bundle CSS, JS files) |
-| `--driver-package <package>` | Test driver package to use (e.g., `meteortesting:mocha`) |
-| `--verbose` | Print all output from build logs |
-| `--no-lint` | Skip running linters on every test app rebuild |
-| `--extra-packages <packages>` | Run with additional packages (comma separated) |
-| `--test-app-path <path>` | Set directory for temporary test app (default: system temp dir) |
+| Option                        | Description                                                     |
+|-------------------------------|-----------------------------------------------------------------|
+| `--port`, `-p <port>`         | Port to listen on (default: 3000). Also uses ports N+1 and N+2  |
+| `--open`, `-o`                | Opens a browser window when the app starts                      |
+| `--inspect[-brk][=<port>]`    | Enable server-side debugging (default port: 9229)               |
+| `--settings`, `-s <file>`     | Set optional data for Meteor.settings on the server             |
+| `--production`                | Simulate production mode (minify and bundle CSS, JS files)      |
+| `--driver-package <package>`  | Test driver package to use (e.g., `meteortesting:mocha`)        |
+| `--filter`, `-f`              | Filter the tests by name                                        |
+| `--verbose`                   | Print all output from build logs                                |
+| `--no-lint`                   | Skip running linters on every test app rebuild                  |
+| `--extra-packages <packages>` | Run with additional packages (comma separated)                  |
+| `--test-app-path <path>`      | Set directory for temporary test app (default: system temp dir) |
 
 #### Mobile Testing Options
 
@@ -1458,23 +1464,45 @@ If no packages are specified, all available packages will be tested.
 
 ### Examples
 
+#### Test specific packages by name
+
 ```bash
-# Test all local packages
-meteor test-packages
-
-# Test specific packages by name
 meteor test-packages accounts-base accounts-password
+```
 
-# Test a package by path
+#### Test a package by path
+
+```bash
 meteor test-packages ./packages/my-package
+```
 
-# Test with custom settings
+#### Test with custom settings
+
+```bash
 meteor test-packages --settings settings.json
+```
 
-# Test with Mocha test driver
+#### Test with Mocha test driver
+
+```bash
 meteor test-packages --driver-package meteortesting:mocha
+```
 
-# Test on mobile device
+#### Test with filter
+
+```bash
+meteor test-packages --filter myTestName
+```
+
+Alternatively, you can use the `TINYTEST_FILTER` environment variable to filter:
+
+```bash
+TINYTEST_FILTER=myTestName meteor test-packages
+```
+
+#### Test on mobile device
+
+```bash
 meteor test-packages --ios-device
 ```
 
