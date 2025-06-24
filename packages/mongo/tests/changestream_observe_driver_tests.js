@@ -1,7 +1,6 @@
 import { Tinytest } from 'meteor/tinytest';
 import { Mongo } from 'meteor/mongo';
 import { Meteor } from 'meteor/meteor';
-import { ChangeStreamObserveDriver } from './changestream_observe_driver';
 
 // Only run these tests if Change Streams are supported
 if (Meteor.isServer && MongoInternals.defaultRemoteCollectionDriver().mongo._supportsChangeStreams) {
