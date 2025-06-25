@@ -291,8 +291,10 @@ Object.assign(Session.prototype, {
     // Destroy this session, even if it's not registered at the
     // server. Stop all processing and tear everything down. If a socket
     // was attached, close it.
-    if (self._removeTimeoutHandle)
+
+    if (self._removeTimeoutHandle) {
       return;
+    }
 
     if (self.socket) {
       self.socket.close();
