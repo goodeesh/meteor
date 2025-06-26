@@ -2558,7 +2558,8 @@ class JsImage {
           symlink: includeNodeModules === 'symlink'
         };
 
-        if (buildMode === "production") {
+        const trySkipDevModule = global.currentCommand?.name === 'build' && buildMode === 'production';
+        if (trySkipDevModule) {
           const targets = global.meteorBundlerTargets || {};
           const isDevOnlyModule = ['client', 'server'].some(target =>
             targets[target]?.packageMap?.getInfo(nmd?.packageName)?.packageSource?.devOnly
