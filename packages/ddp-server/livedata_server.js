@@ -293,8 +293,11 @@ Object.assign(Session.prototype, {
     // was attached, close it.
 
     if (self._removeTimeoutHandle) {
-      return;
+      Meteor.clearTimeout(self._removeTimeoutHandle);
+      self._removeTimeoutHandle = null;
     }
+
+    self._expectingDisconnect = true;
 
     if (self.socket) {
       self.socket.close();
