@@ -72,6 +72,14 @@ meteor add react-meteor-data@4.0.0
 
 > These settings are on by default for new apps.
 
+On activate `modern` your app will be updated to use SWC transpiler. It will automatically fallback to Babel if your code can't be transpiled wit SWC.
+
+Check the docs for help with the SWC migration, especially if your project uses many Babel plugins.
+
+[Modern Transpiler: SWC docs](https://docs.meteor.com/about/modern-build-stack/transpiler-swc.html)
+
+If you find any issues, please report them to the [Meteor issues tracker](https://github.com/meteor/meteor).
+
 #### Bumped Meteor Packages
 
 - accounts-base@3.1.1
