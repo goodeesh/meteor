@@ -3,7 +3,6 @@ Package.describe({
   version: '1.9.3',
   summary: 'Standard css minifier used with Meteor apps by default.',
   documentation: 'README.md',
-  devOnly: true,
 });
 
 Package.registerBuildPlugin({
