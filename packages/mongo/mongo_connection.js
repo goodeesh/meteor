@@ -202,6 +202,7 @@ MongoConnection.prototype._onFailover = function (callback) {
 
 MongoConnection.prototype.insertAsync = async function (collection_name, document) {
   const self = this;
+  console.log('🔥 insertAsync-mongo_connection', collection_name, document.sessionId, document.description);
 
   if (collection_name === "___meteor_failure_test_collection") {
     const e = new Error("Failure test");
@@ -224,10 +225,12 @@ MongoConnection.prototype.insertAsync = async function (collection_name, documen
       safe: true,
     }
   ).then(async ({insertedId}) => {
+    process.env.DEBUG && console.log('🔥 insertAsync-mongo_connection-then', insertedId);
     await refresh();
     await write.committed();
     return insertedId;
   }).catch(async e => {
+    process.env.DEBUG && console.log('🔥 insertAsync-mongo_connection-catch', e);
     await write.committed();
     throw e;
   });
@@ -254,7 +257,7 @@ MongoConnection.prototype._refresh = async function (collectionName, selector) {
 
 MongoConnection.prototype.removeAsync = async function (collection_name, selector) {
   var self = this;
-
+  process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection', collection_name, selector);
   if (collection_name === "___meteor_failure_test_collection") {
     var e = new Error("Failure test");
     e._expectedByTest = true;
@@ -271,10 +274,12 @@ MongoConnection.prototype.removeAsync = async function (collection_name, selecto
       safe: true,
     })
     .then(async ({ deletedCount }) => {
+      process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection-then', deletedCount);
       await refresh();
       await write.committed();
       return transformResult({ result : {modifiedCount : deletedCount} }).numberAffected;
     }).catch(async (err) => {
+      process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection-catch', err);
       await write.committed();
       throw err;
     });
@@ -282,7 +287,7 @@ MongoConnection.prototype.removeAsync = async function (collection_name, selecto
 
 MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
   var self = this;
-
+  process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection', collectionName);
 
   var write = self._maybeBeginWrite();
   var refresh = function() {
@@ -297,11 +302,13 @@ MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
     .rawCollection(collectionName)
     .drop()
     .then(async result => {
+      process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection-then', result);
       await refresh();
       await write.committed();
       return result;
     })
     .catch(async e => {
+      process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection-catch', e);
       await write.committed();
       throw e;
     });
@@ -311,6 +318,7 @@ MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
 // because it lets the test's fence wait for it to be complete.
 MongoConnection.prototype.dropDatabaseAsync = async function () {
   var self = this;
+  process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection');
 
   var write = self._maybeBeginWrite();
   var refresh = async function () {
@@ -319,9 +327,11 @@ MongoConnection.prototype.dropDatabaseAsync = async function () {
 
   try {
     await self.db._dropDatabase();
+    process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection-then');
     await refresh();
     await write.committed();
   } catch (e) {
+    process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection-catch', e);
     await write.committed();
     throw e;
   }
@@ -329,6 +339,7 @@ MongoConnection.prototype.dropDatabaseAsync = async function () {
 
 MongoConnection.prototype.updateAsync = async function (collection_name, selector, mod, options) {
   var self = this;
+  process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection', collection_name, selector, mod, options);
 
   if (collection_name === "___meteor_failure_test_collection") {
     var e = new Error("Failure test");
@@ -417,6 +428,7 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
     //     then we can just let Mongo generate the id
     return await simulateUpsertWithInsertedId(collection, mongoSelector, mongoMod, options)
       .then(async result => {
+        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-then-simulateUpsert', result);
         await refresh();
         await write.committed();
         if (result && ! options._returnObject) {
@@ -424,6 +436,11 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
         } else {
           return result;
         }
+      })
+      .catch(async (err) => {
+        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-catch-simulateUpsert', err);
+        await write.committed();
+        throw err;
       });
   } else {
     if (options.upsert && !knownId && options.insertedId && isModify) {
@@ -444,6 +461,7 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
       .bind(collection)(mongoSelector, mongoMod, mongoOpts)
       .then(async result => {
         var meteorResult = transformResult({result});
+        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-then', meteorResult);
         if (meteorResult && options._returnObject) {
           // If this was an upsertAsync() call, and we ended up
           // inserting a new doc and we know its id, then
@@ -464,6 +482,7 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
           return meteorResult.numberAffected;
         }
       }).catch(async (err) => {
+        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-catch', err);
         await write.committed();
         throw err;
       });
@@ -495,8 +514,7 @@ MongoConnection._isCannotChangeIdError = function (err) {
 // doc).
 MongoConnection.prototype.upsertAsync = async function (collectionName, selector, mod, options) {
   var self = this;
-
-
+  process.env.DEBUG && console.log('🔥 upsertAsync-mongo_connection', collectionName, selector, mod, options);
 
   if (typeof options === "function" && ! callback) {
     callback = options;
