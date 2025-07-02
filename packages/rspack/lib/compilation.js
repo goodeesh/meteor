@@ -54,7 +54,9 @@ function setupCompilationTracking() {
     clientMs: null,
     serverMs: null,
     timeoutId: null,
-    firstPrint: false,
+    initialCompilationOccurred: false,
+    previousClientResolved: false,
+    previousServerResolved: false,
     previousMaxTime: 0,
     // Base delay in milliseconds
     baseDelay: 100,
@@ -66,10 +68,23 @@ function setupCompilationTracking() {
     },
     // Function to print the maximum time once compilations are complete
     printMaxTime: function() {
-      const shouldPrint =
-          clientFirstCompile?.resolved && serverFirstCompile?.resolved
-          ? this.clientMs !== null || this.serverMs !== null
-          : this.clientMs !== null && this.serverMs !== null;
+      const clientResolved = clientFirstCompile?.resolved || false;
+      const serverResolved = serverFirstCompile?.resolved || false;
+
+      // Check if this is the first time both client and server are resolved
+      // but were previously not both resolved
+      if (clientResolved && serverResolved && 
+          !(this.previousClientResolved && this.previousServerResolved) && 
+          !this.initialCompilationOccurred) {
+        this.initialCompilationOccurred = true;
+      }
+
+      // Update previous resolved states for next call
+      this.previousClientResolved = clientResolved;
+      this.previousServerResolved = serverResolved;
+
+      const shouldPrint = this.initialCompilationOccurred &&
+        (this.clientMs !== null || this.serverMs !== null);
 
       // Clear any existing timeout
       if (this.timeoutId !== null) {
@@ -91,7 +106,7 @@ function setupCompilationTracking() {
           const maxMs = Math.max(clientTime, serverTime);
           console.log(
             `| Total: ${formatMilliseconds(maxMs)} ms (RSPack ${
-              this.firstPrint ? 'Rebuild' : 'Build'
+              this.initialCompilationOccurred ? 'Rebuild' : 'Build'
             } App)`
           );
 
@@ -103,7 +118,6 @@ function setupCompilationTracking() {
           this.clientMs = null;
           this.serverMs = null;
           this.timeoutId = null;
-          this.firstPrint = true;
         }, deferTime);
       }
     },
