@@ -884,9 +884,8 @@ Object.assign(MongoConnection.prototype, {
             matcher = new Minimongo.Matcher(cursorDescription.selector);
             return true;
           } catch (e) {
-            if (e.message && (e.message.includes('needs an array') )) {
-              throw e;
-            }
+            // XXX make all compilation errors MinimongoError or something
+            //     so that this doesn't ignore unrelated exceptions
             return false;
           }
         },
