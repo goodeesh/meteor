@@ -792,9 +792,9 @@ MongoConnection.prototype.tail = function (cursorDescription, docCallback, timeo
   });
 
   return {
-    stop: async function () {
+    stop: function () {
       stopped = true;
-      await cursor.close();
+      cursor.close()
     }
   };
 };
@@ -882,7 +882,7 @@ Object.assign(MongoConnection.prototype, {
           // some newfangled $selector that minimongo doesn't support yet.
           try {
             matcher = new Minimongo.Matcher(cursorDescription.selector);
-            return !!matcher;
+            return true;
           } catch (e) {
             if (e.message && (e.message.includes('needs an array') )) {
               throw e;

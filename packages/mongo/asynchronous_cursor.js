@@ -48,8 +48,9 @@ export class AsynchronousCursor {
       this._pendingNext = null;
       return result;
     } catch (e) {
-      this._pendingNext = null;
       console.error(e);
+    } finally {
+      this._pendingNext = null;
     }
   }
 
@@ -83,24 +84,25 @@ export class AsynchronousCursor {
   // Returns a promise which is resolved with the next object (like with
   // _nextObjectPromise) or rejected if the cursor doesn't return within
   // timeoutMS ms.
-  async _nextObjectPromiseWithTimeout(timeoutMS) {
-    if (!timeoutMS) {
-      return this._nextObjectPromise();
-    }
+  _nextObjectPromiseWithTimeout(timeoutMS) {
     const nextObjectPromise = this._nextObjectPromise();
-    const timeoutErr = new Error('Client-side timeout waiting for next object');
-    const timeoutPromise = new Promise((resolve, reject) => {
-      setTimeout(() => {
-        reject(timeoutErr);
+    if (!timeoutMS) {
+      return nextObjectPromise;
+    }
+
+    const timeoutPromise = new Promise(resolve => {
+      // On timeout, close the cursor.
+      const timeoutId = setTimeout(() => {
+        resolve(this.close());
       }, timeoutMS);
-    });
-      return Promise.race([nextObjectPromise, timeoutPromise]).catch(async err => {
-        if (err === timeoutErr) {
-          return this.close();
-        }
-        // If the error is not a timeout, rethrow it.
-        throw err;
+
+      // If the `_nextObjectPromise` returned first, cancel the timeout.
+      nextObjectPromise.finally(() => {
+        clearTimeout(timeoutId);
       });
+    });
+
+    return Promise.race([nextObjectPromise, timeoutPromise]);
   }
 
   async forEach(callback, thisArg) {
@@ -142,9 +144,7 @@ export class AsynchronousCursor {
         // ignore
       }
     }
-    if (this._dbCursor && typeof this._dbCursor.close === 'function') {
-      await this._dbCursor.close();
-    }
+    this._dbCursor.close();
   }
 
   fetch() {
