@@ -5,7 +5,7 @@ import { AsynchronousCursor } from './asynchronous_cursor';
 import { Cursor } from './cursor';
 import { CursorDescription } from './cursor_description';
 import { DocFetcher } from './doc_fetcher';
-import { MongoDB, replaceMeteorAtomWithMongo, replaceTypes, transformResult } from './mongo_common';
+import { MongoDB, replaceMeteorAtomWithMongo, replaceTypes, transformResult, QueryError } from './mongo_common';
 import { ObserveHandle } from './observe_handle';
 import { ObserveMultiplexer } from './observe_multiplex';
 import { OplogObserveDriver } from './oplog_observe_driver';
@@ -794,7 +794,7 @@ MongoConnection.prototype.tail = function (cursorDescription, docCallback, timeo
   return {
     stop: function () {
       stopped = true;
-      cursor.close()
+      cursor.close();
     }
   };
 };
@@ -886,6 +886,9 @@ Object.assign(MongoConnection.prototype, {
           } catch (e) {
             // XXX make all compilation errors MinimongoError or something
             //     so that this doesn't ignore unrelated exceptions
+            if (e instanceof QueryError) {
+              throw e;
+            }
             return false;
           }
         },
