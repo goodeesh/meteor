@@ -18,7 +18,6 @@ const {
 
 const {
   ensureModuleFilesExist,
-  writeMainClientContent,
   writeMainClientEntryForHMR
 } = require('./build-context');
 
@@ -64,7 +63,6 @@ function configureMeteorForRSPack() {
 
   // Write content to module files
   if (isMeteorAppDevelopment()) {
-    writeMainClientContent();
     writeMainClientEntryForHMR();
     setMeteorAppCustomScriptUrl(addEnvSuffixToFilename('/__rspack__/main-client.js'));
   }

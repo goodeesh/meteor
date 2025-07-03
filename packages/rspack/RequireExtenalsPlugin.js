@@ -6,75 +6,90 @@ const path = require('path');
 class RequireExternalsPlugin {
   constructor({ buildContext } = {}) {
     this.pluginName = 'RequireExternalsPlugin';
-    this.imports = new Set();
     this._prefix = 'external ';
     this._prefixLen = this._prefix.length;
-    this._funcCount = 1;            // start your counter at 1
+    this._funcCount = 1;
     this._buildContext = buildContext;
-
-    // Determine output file path
     this.filePath = path.resolve(
       process.cwd(),
       buildContext,
       `main-client.dev.js`
     );
-
-    // Initialize existing imports from file via single regex pass
-    try {
-      const content = fs.readFileSync(this.filePath, 'utf-8');
-      const requireRegex = /require\('([^']+)'\)/g;
-      let match;
-      while ((match = requireRegex.exec(content)) !== null) {
-        this.imports.add(match[1]);
-      }
-    } catch {
-      // file not found or unreadable: start fresh
-    }
   }
 
   apply(compiler) {
-    compiler.hooks.done.tap(this.pluginName, (stats) => {
-      const info = stats.toJson({ modules: true });
+    compiler.hooks.done.tap({ name: this.pluginName, stage: -10 }, (stats) => {
+      // 1) Ensure globalThis.module / exports block is present
+      this._ensureGlobalThisModule();
 
-      const existing = this.imports;
-      const { _prefix: prefix, _prefixLen: prefixLen } = this;
+      // 2) Re-load existing requires from disk on every run
+      const existing = this._readExistingRequires();
+
+      // 3) Collect any new externals from this build
+      const info = stats.toJson({ modules: true });
       const newRequires = [];
 
-      // single-pass over modules, avoid toJson()
       for (const module of info.modules) {
         const name = module.name;
-        if (typeof name !== 'string' || !name.startsWith(prefix)) continue;
-
-        let pkg = name.slice(prefixLen);
-        if (pkg[0] === '"' && pkg[pkg.length - 1] === '"') {
-          pkg = pkg.slice(1, -1);
-        }
-
+        if (typeof name !== 'string' || !name.startsWith(this._prefix)) continue;
+        let pkg = name.slice(this._prefixLen);
+        if (pkg.startsWith('"') && pkg.endsWith('"')) pkg = pkg.slice(1, -1);
         if (!existing.has(pkg)) {
           existing.add(pkg);
           newRequires.push(`require('${pkg}')`);
         }
       }
 
+      // 4) Append new imports if any
       if (newRequires.length) {
-        // generate a unique function name
         const fnName = `lazyExternalImports${this._funcCount++}`;
-
-        // indent each require call and terminate with semicolon
-        const body = newRequires
-          .map(req => `  ${req};`)
-          .join('\n');
-
-        // wrap in a function
-        const fnCode = `function ${fnName}() {\n${body}\n}`;
-
+        const body = newRequires.map(req => `  ${req};`).join('\n');
+        const fnCode = `\nfunction ${fnName}() {\n${body}\n}\n`;
         try {
-          fs.appendFileSync(this.filePath, `\n${fnCode}\n`);
+          fs.appendFileSync(this.filePath, fnCode);
         } catch (err) {
           console.error(`Failed to append imports to ${this.filePath}:`, err);
         }
       }
     });
+  }
+
+  _ensureGlobalThisModule() {
+    const block = [
+      `if (typeof globalThis.module === 'undefined') {`,
+      `  globalThis.module = { exports: {} };`,
+      `}`,
+      `if (typeof globalThis.exports === 'undefined') {`,
+      `  globalThis.exports = globalThis.module.exports;`,
+      `}`
+    ].join('\n') + '\n';
+
+    let content = '';
+    if (fs.existsSync(this.filePath)) {
+      content = fs.readFileSync(this.filePath, 'utf-8');
+      if (!content.includes(`typeof globalThis.module === 'undefined'`)) {
+        // Prepend so it lives at the very top
+        fs.writeFileSync(this.filePath, block + content, 'utf-8');
+      }
+    } else {
+      // File doesn’t exist yet: create with just the block
+      fs.writeFileSync(this.filePath, block, 'utf-8');
+    }
+  }
+
+  _readExistingRequires() {
+    const existing = new Set();
+    try {
+      const content = fs.readFileSync(this.filePath, 'utf-8');
+      const requireRegex = /require\('([^']+)'\)/g;
+      let match;
+      while ((match = requireRegex.exec(content)) !== null) {
+        existing.add(match[1]);
+      }
+    } catch {
+      // ignore if file missing or unreadable
+    }
+    return existing;
   }
 }
 

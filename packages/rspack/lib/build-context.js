@@ -121,114 +121,6 @@ function ensureModuleFilesExist() {
 }
 
 /**
- * Writes custom content to the main-client.js entrypoint when in dev mode.
- * This helper function can be used to inject custom code into the client entry point.
- * It preserves existing requires and only adds new ones in a separate function.
- *
- * @returns {boolean} - True if the content was written successfully, false otherwise
- */
-function writeMainClientContent() {
-  // Only write custom content in development mode
-  if (!isMeteorAppDevelopment()) {
-    return false;
-  }
-
-  const appDir = getMeteorAppDir();
-  const filePath = `${appDir}/${RSPACK_BUILD_CONTEXT}/${addEnvSuffixToFilename('main-client.js')}`;
-
-  try {
-    // Ensure the file exists before writing to it
-    if (!fs.existsSync(filePath)) {
-      ensureModuleFilesExist();
-    }
-
-    const isReactEnabled = !!process.env.METEOR_REACT_ENABLED;
-    const meteorPackages = getMeteorAppPackages().map(pkg => `meteor/${pkg}`);
-
-    // Add React packages if enabled
-    const allPackages = isReactEnabled 
-      ? ['react', 'react-dom', ...meteorPackages] 
-      : meteorPackages;
-
-    // Initialize with base content if file doesn't exist or is empty
-    let fileContent = '';
-    const existing = new Set();
-    let funcCount = 0;
-
-    // Define the globalThis.module check block
-    const globalThisModuleBlock = `if (typeof globalThis.module === 'undefined') {
-    globalThis.module = { exports: {} };
-}
-if (typeof globalThis.exports === 'undefined') {
-    globalThis.exports = globalThis.module.exports;
-}`;
-
-    // Read existing file content if it exists
-    if (fs.existsSync(filePath)) {
-      fileContent = fs.readFileSync(filePath, 'utf8');
-
-      // Check if the globalThis.module block exists
-      if (!fileContent.includes('typeof globalThis.module === \'undefined\'')) {
-        // Add the block at the top of the file
-        fileContent = fileContent + '\n' + globalThisModuleBlock + '\n';
-        // Write the updated content back to the file
-        fs.writeFileSync(filePath, fileContent, 'utf8');
-      }
-
-      // Parse existing requires
-      const requireRegex = /require\(['"]([^'"]+)['"]\)/g;
-      let match;
-      while ((match = requireRegex.exec(fileContent)) !== null) {
-        existing.add(match[1]);
-      }
-
-      // Find the highest function count to ensure unique function names
-      const funcCountRegex = /lazyExternalImports(\d+)/g;
-      while ((match = funcCountRegex.exec(fileContent)) !== null) {
-        funcCount = Math.max(funcCount, parseInt(match[1], 10) + 1);
-      }
-    } else {
-      // Initialize with base content if file doesn't exist
-      fileContent = globalThisModuleBlock + '\n';
-    }
-
-    // Find new packages that need to be required
-    const newRequires = [];
-    for (const pkg of allPackages) {
-      if (!existing.has(pkg)) {
-        existing.add(pkg);
-        newRequires.push(`require('${pkg}')`);
-      }
-    }
-
-    // If there are new requires, add them in a new function
-    if (newRequires.length) {
-      // Generate a unique function name
-      const fnName = `lazyExternalImports${funcCount}`;
-
-      // Indent each require call
-      const body = newRequires
-        .map(req => `  ${req};`)
-        .join('\n');
-
-      // Wrap in a function
-      const fnCode = `\nfunction ${fnName}() {\n${body}\n}\n`;
-
-      // Append to the file
-      fs.appendFileSync(filePath, fnCode);
-    } else if (!fs.existsSync(filePath)) {
-      // If no new requires but file doesn't exist, write the base content
-      fs.writeFileSync(filePath, fileContent, 'utf8');
-    }
-
-    return true;
-  } catch (error) {
-    logError(`Failed to write custom content to main-client.js: ${error.message}`);
-    return false;
-  }
-}
-
-/**
  * Writes custom content to the main-client.hmr.js entrypoint when in dev mode.
  * This helper function can be used to inject custom code into the client entry point.
  *
@@ -269,6 +161,5 @@ module.exports = {
   getInitialEntrypoints,
   ensureRSPackBuildContextExists,
   ensureModuleFilesExist,
-  writeMainClientContent,
   writeMainClientEntryForHMR
 };
