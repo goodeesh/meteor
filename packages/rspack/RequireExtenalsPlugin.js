@@ -8,13 +8,15 @@ class RequireExternalsPlugin {
     this.pluginName = 'RequireExternalsPlugin';
     this._prefix = 'external ';
     this._prefixLen = this._prefix.length;
-    this._funcCount = 1;
     this._buildContext = buildContext;
     this.filePath = path.resolve(
       process.cwd(),
       buildContext,
       `main-client.dev.js`
     );
+
+    // Initialize funcCount based on existing helpers in the file
+    this._funcCount = this._computeNextFuncCount();
   }
 
   apply(compiler) {
@@ -25,10 +27,46 @@ class RequireExternalsPlugin {
       // 2) Re-load existing requires from disk on every run
       const existing = this._readExistingRequires();
 
-      // 3) Collect any new externals from this build
+      // 2a) Compute the *current* externals in this build
       const info = stats.toJson({ modules: true });
-      const newRequires = [];
+      const current = new Set();
+      for (const m of info.modules) {
+        if (typeof m.name === 'string' && m.name.startsWith(this._prefix)) {
+          let pkg = m.name.slice(this._prefixLen);
+          if (pkg.startsWith('"') && pkg.endsWith('"')) pkg = pkg.slice(1, -1);
+          current.add(pkg);
+        }
+      }
 
+      // 2b) Remove any requires that are no longer in `current`
+      const toRemove = [...existing].filter(p => !current.has(p));
+      if (toRemove.length) {
+        let content = fs.readFileSync(this.filePath, 'utf-8');
+
+        // Strip stale require(...) lines
+        for (const pkg of toRemove) {
+          const re = new RegExp(`^.*require\\('${pkg}'\\);?.*(\\r?\\n)?`, 'gm');
+          content = content.replace(re, '');
+        }
+
+        // Strip out any now-empty helper functions:
+        //   function lazyExternalImportsX() {
+        //   }
+        const emptyFnRe = /^function\s+lazyExternalImports\d+\s*\(\)\s*{\s*}\s*(\r?\n)?/gm;
+        content = content.replace(emptyFnRe, '');
+
+        // Write the cleaned file back
+        fs.writeFileSync(this.filePath, content, 'utf-8');
+
+        // Re-populate `existing` so the add-diff is accurate
+        existing.clear();
+        for (const match of content.matchAll(/require\('([^']+)'\)/g)) {
+          existing.add(match[1]);
+        }
+      }
+
+      // 3) Collect any new externals from this build
+      const newRequires = [];
       for (const module of info.modules) {
         const name = module.name;
         if (typeof name !== 'string' || !name.startsWith(this._prefix)) continue;
@@ -52,6 +90,25 @@ class RequireExternalsPlugin {
         }
       }
     });
+  }
+
+  _computeNextFuncCount() {
+    let max = 0;
+    if (fs.existsSync(this.filePath)) {
+      try {
+        const content = fs.readFileSync(this.filePath, 'utf-8');
+        const fnRe = /function\s+lazyExternalImports(\d+)\s*\(\)/g;
+        let match;
+        while ((match = fnRe.exec(content)) !== null) {
+          const n = parseInt(match[1], 10);
+          if (n > max) max = n;
+        }
+      } catch {
+        // ignore read errors
+      }
+    }
+    // next count is max found plus one
+    return max + 1;
   }
 
   _ensureGlobalThisModule() {
