@@ -410,6 +410,12 @@ Object.assign(OplogObserveDriver.prototype, {
     });
   },
   _handleDoc: function (id, newDoc) {
+    if (newDoc.createdAt) {
+      const now = Date.now();
+      const insertedAt = new Date(newDoc.createdAt).getTime();
+      const latencyMs = now - insertedAt;
+      console.log(`⏱️ EventDriver INSERT latency: ${latencyMs} ms (ID: ${id})`);
+    }
     var self = this;
     Meteor._noYieldsAllowed(function () {
       var matchesNow = newDoc && self._matcher.documentMatches(newDoc).result;

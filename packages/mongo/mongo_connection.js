@@ -11,7 +11,8 @@ import { ObserveMultiplexer } from './observe_multiplex';
 import { OplogObserveDriver } from './oplog_observe_driver';
 import { OPLOG_COLLECTION, OplogHandle } from './oplog_tailing';
 import { PollingObserveDriver } from './polling_observe_driver';
-// import { ChangeStreamObserveDriver } from './changestream_observe_driver';
+import { ChangeStreamObserveDriver } from './changestream_observe_driver';
+import { emitDatabaseEvent, EventObserveDriver } from './event_observe_driver';
 
 const FILE_ASSET_SUFFIX = 'Asset';
 const ASSETS_FOLDER = 'assets';
@@ -141,12 +142,6 @@ MongoConnection.prototype._checkChangeStreamSupport = async function() {
     
     self._supportsChangeStreams = isReplicaSet || isSharded;
     
-    if (self._supportsChangeStreams) {
-      console.log('MongoDB Change Streams are available and will be used for real-time updates');
-    } else {
-      console.log('MongoDB Change Streams not available (requires replica set or sharded cluster)');
-    }
-    
   } catch (error) {
     console.warn('Error checking Change Streams support:', error.message);
     self._supportsChangeStreams = false;
@@ -202,7 +197,9 @@ MongoConnection.prototype._onFailover = function (callback) {
 
 MongoConnection.prototype.insertAsync = async function (collection_name, document) {
   const self = this;
-  console.log('🔥 insertAsync-mongo_connection', collection_name, document.sessionId, document.description);
+
+  // DEBUG purposes
+  document.createdAt = new Date();
 
   if (collection_name === "___meteor_failure_test_collection") {
     const e = new Error("Failure test");
@@ -225,12 +222,14 @@ MongoConnection.prototype.insertAsync = async function (collection_name, documen
       safe: true,
     }
   ).then(async ({insertedId}) => {
-    process.env.DEBUG && console.log('🔥 insertAsync-mongo_connection-then', insertedId);
+      emitDatabaseEvent(collection_name, 'insert', {
+      id: document._id,
+      document: document
+    });
     await refresh();
     await write.committed();
     return insertedId;
   }).catch(async e => {
-    process.env.DEBUG && console.log('🔥 insertAsync-mongo_connection-catch', e);
     await write.committed();
     throw e;
   });
@@ -257,7 +256,6 @@ MongoConnection.prototype._refresh = async function (collectionName, selector) {
 
 MongoConnection.prototype.removeAsync = async function (collection_name, selector) {
   var self = this;
-  process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection', collection_name, selector);
   if (collection_name === "___meteor_failure_test_collection") {
     var e = new Error("Failure test");
     e._expectedByTest = true;
@@ -269,17 +267,33 @@ MongoConnection.prototype.removeAsync = async function (collection_name, selecto
     await self._refresh(collection_name, selector);
   };
 
+  // First, get documents that will be deleted to emit proper events
+  const docsToDelete = await self.rawCollection(collection_name)
+    .find(replaceTypes(selector, replaceMeteorAtomWithMongo))
+    .toArray();
+
   return self.rawCollection(collection_name)
     .deleteMany(replaceTypes(selector, replaceMeteorAtomWithMongo), {
       safe: true,
     })
     .then(async ({ deletedCount }) => {
-      process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection-then', deletedCount);
+      // Emit database events for each deleted document
+      if (deletedCount > 0 && docsToDelete.length > 0) {
+        try {
+          for (const doc of docsToDelete) {
+            emitDatabaseEvent(collection_name, 'delete', {
+              id: doc._id,
+              previousDocument: doc
+            });
+          }
+        } catch (eventErr) {
+          console.warn('Failed to emit delete events:', eventErr);
+        }
+      }
       await refresh();
       await write.committed();
       return transformResult({ result : {modifiedCount : deletedCount} }).numberAffected;
     }).catch(async (err) => {
-      process.env.DEBUG && console.log('🔥 removeAsync-mongo_connection-catch', err);
       await write.committed();
       throw err;
     });
@@ -287,7 +301,6 @@ MongoConnection.prototype.removeAsync = async function (collection_name, selecto
 
 MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
   var self = this;
-  process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection', collectionName);
 
   var write = self._maybeBeginWrite();
   var refresh = function() {
@@ -302,13 +315,11 @@ MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
     .rawCollection(collectionName)
     .drop()
     .then(async result => {
-      process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection-then', result);
       await refresh();
       await write.committed();
       return result;
     })
     .catch(async e => {
-      process.env.DEBUG && console.log('🔥 dropCollectionAsync-mongo_connection-catch', e);
       await write.committed();
       throw e;
     });
@@ -318,7 +329,6 @@ MongoConnection.prototype.dropCollectionAsync = async function(collectionName) {
 // because it lets the test's fence wait for it to be complete.
 MongoConnection.prototype.dropDatabaseAsync = async function () {
   var self = this;
-  process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection');
 
   var write = self._maybeBeginWrite();
   var refresh = async function () {
@@ -327,11 +337,9 @@ MongoConnection.prototype.dropDatabaseAsync = async function () {
 
   try {
     await self.db._dropDatabase();
-    process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection-then');
     await refresh();
     await write.committed();
   } catch (e) {
-    process.env.DEBUG && console.log('🔥 dropDatabaseAsync-mongo_connection-catch', e);
     await write.committed();
     throw e;
   }
@@ -339,7 +347,6 @@ MongoConnection.prototype.dropDatabaseAsync = async function () {
 
 MongoConnection.prototype.updateAsync = async function (collection_name, selector, mod, options) {
   var self = this;
-  process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection', collection_name, selector, mod, options);
 
   if (collection_name === "___meteor_failure_test_collection") {
     var e = new Error("Failure test");
@@ -372,6 +379,17 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
   var refresh = async function () {
     await self._refresh(collection_name, selector);
   };
+
+  // Get documents before update to emit proper events
+  let docsBeforeUpdate = [];
+  try {
+    docsBeforeUpdate = await self.rawCollection(collection_name)
+      .find(replaceTypes(selector, replaceMeteorAtomWithMongo))
+      .toArray();
+  } catch (err) {
+    // If we can't get the before documents, we'll still proceed with the update
+    console.warn('Failed to get documents before update for event emission:', err);
+  }
 
   var collection = self.rawCollection(collection_name);
   var mongoOpts = {safe: true};
@@ -427,8 +445,45 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
     // - The user did not specify any id preference and the id is a Mongo ObjectId,
     //     then we can just let Mongo generate the id
     return await simulateUpsertWithInsertedId(collection, mongoSelector, mongoMod, options)
-      .then(async result => {
-        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-then-simulateUpsert', result);
+      .then(async result => {  
+        // Emit database events for simulated upsert
+        try {
+          if (result && result.insertedId) {
+            // This was an upsert that resulted in an insert
+            const newDoc = await self.rawCollection(collection_name)
+              .findOne({ _id: result.insertedId });
+            
+            if (newDoc) {
+              emitDatabaseEvent(collection_name, 'insert', {
+                id: result.insertedId,
+                document: newDoc
+              });
+            }
+          } else if (result && result.numberAffected > 0) {
+            // This was an update
+            const docsAfterUpdate = await self.rawCollection(collection_name)
+              .find(replaceTypes(selector, replaceMeteorAtomWithMongo))
+              .toArray();
+            
+            // Create a map of before documents by ID
+            const beforeMap = new Map();
+            for (const doc of docsBeforeUpdate) {
+              beforeMap.set(doc._id.toString(), doc);
+            }
+            
+            // Emit events for each updated document
+            for (const docAfter of docsAfterUpdate) {
+              const docBefore = beforeMap.get(docAfter._id.toString());
+              emitDatabaseEvent(collection_name, 'update', {
+                id: docAfter._id,
+                document: docAfter,
+                previousDocument: docBefore
+              });
+            }
+          }
+        } catch (eventErr) {
+          console.warn('Failed to emit simulated upsert events:', eventErr);
+        } 
         await refresh();
         await write.committed();
         if (result && ! options._returnObject) {
@@ -438,7 +493,6 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
         }
       })
       .catch(async (err) => {
-        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-catch-simulateUpsert', err);
         await write.committed();
         throw err;
       });
@@ -460,8 +514,52 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
     return collection[updateMethod]
       .bind(collection)(mongoSelector, mongoMod, mongoOpts)
       .then(async result => {
-        var meteorResult = transformResult({result});
-        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-then', meteorResult);
+        var meteorResult = transformResult({result});   
+        // Emit database events after successful update
+        try {
+          if (meteorResult.numberAffected > 0 || meteorResult.insertedId) {
+            if (options.upsert && meteorResult.insertedId) {
+              // This was an upsert that resulted in an insert
+              const insertedId = knownId || meteorResult.insertedId;
+              const newDoc = await self.rawCollection(collection_name)
+                .findOne({ _id: insertedId });
+              
+              if (newDoc) {
+                emitDatabaseEvent(collection_name, 'insert', {
+                  id: insertedId,
+                  document: newDoc
+                });
+              }
+            } else if (meteorResult.numberAffected > 0) {
+              // This was an update/replace
+              // Get updated documents
+              const docsAfterUpdate = await self.rawCollection(collection_name)
+                .find(replaceTypes(selector, replaceMeteorAtomWithMongo))
+                .toArray();
+              
+              // Create a map of before documents by ID
+              const beforeMap = new Map();
+              for (const doc of docsBeforeUpdate) {
+                beforeMap.set(doc._id.toString(), doc);
+              }
+              
+              // Emit events for each updated document
+              for (const docAfter of docsAfterUpdate) {
+                const docBefore = beforeMap.get(docAfter._id.toString());
+                const operation = isModify ? 'update' : 'replace';
+                
+                emitDatabaseEvent(collection_name, operation, {
+                  id: docAfter._id,
+                  document: docAfter,
+                  previousDocument: docBefore
+                });
+              }
+            }
+          }
+        } catch (eventErr) {
+          console.warn('Failed to emit update/upsert events:', eventErr);
+        }
+        
         if (meteorResult && options._returnObject) {
           // If this was an upsertAsync() call, and we ended up
           // inserting a new doc and we know its id, then
@@ -482,7 +580,6 @@ MongoConnection.prototype.updateAsync = async function (collection_name, selecto
           return meteorResult.numberAffected;
         }
       }).catch(async (err) => {
-        process.env.DEBUG && console.log('🔥 updateAsync-mongo_connection-catch', err);
         await write.committed();
         throw err;
       });
@@ -514,7 +611,6 @@ MongoConnection._isCannotChangeIdError = function (err) {
 // doc).
 MongoConnection.prototype.upsertAsync = async function (collectionName, selector, mod, options) {
   var self = this;
-  process.env.DEBUG && console.log('🔥 upsertAsync-mongo_connection', collectionName, selector, mod, options);
 
   if (typeof options === "function" && ! callback) {
     callback = options;
@@ -909,6 +1005,24 @@ Object.assign(MongoConnection.prototype, {
     if (firstHandle) {
       var matcher, sorter;
       
+      // Check if Event Driver is enabled and available
+      var canUseEventDriver = [
+        function () {
+          // Check if event driver is explicitly enabled
+          const mongoSettings = Meteor.settings?.packages?.mongo || {};
+          return mongoSettings.useEventDriver === true;
+        },
+        function () {
+          // Event driver supports most cursors
+          try {
+            matcher = new Minimongo.Matcher(cursorDescription.selector);
+            return EventObserveDriver.cursorSupported(cursorDescription, matcher);
+          } catch (e) {
+            return false;
+          }
+        }
+      ].every(f => f());
+      
       // Check if Change Streams are available and enabled
       var canUseChangeStreams = [
         function () {
@@ -996,20 +1110,24 @@ Object.assign(MongoConnection.prototype, {
         }
       ].every(f => f());  // invoke each function and check if all return true
 
-      // Choose driver in order of preference: ChangeStreams > Oplog > Polling
+      // Choose driver in order of preference: EventDriver > ChangeStreams > Oplog > Polling
       var driverClass;
-      if (canUseChangeStreams) {
+      if (process.env.MONGO_OBSERVE_DRIVER === 'event') {
+        driverClass = EventObserveDriver;
+        console.log(`🎯 EventDriver: Using EventObserveDriver for collection ${collectionName}`);
+      } else if (process.env.MONGO_OBSERVE_DRIVER === 'change-streams') {
         // Use dynamic import to avoid circular dependency issues
         try {
-          const { ChangeStreamObserveDriver } = require('./changestream_observe_driver');
           driverClass = ChangeStreamObserveDriver;
         } catch (error) {
           console.warn('Failed to load ChangeStreamObserveDriver, falling back to oplog/polling:', error.message);
           driverClass = canUseOplog ? OplogObserveDriver : PollingObserveDriver;
         }
-      } else if (canUseOplog) {
+      } else if (canUseOplog && process.env.MONGO_OBSERVE_DRIVER === 'oplog') {
+        console.log(`🎯 OplogDriver: Using OplogObserveDriver for collection ${collectionName}`);
         driverClass = OplogObserveDriver;
       } else {
+        console.log(`🎯 PollingDriver: Using PollingObserveDriver for collection ${collectionName}`);
         driverClass = PollingObserveDriver;
       }
       

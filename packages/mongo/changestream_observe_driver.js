@@ -1,22 +1,27 @@
 import { Meteor } from 'meteor/meteor';
 import { LocalCollection } from 'meteor/minimongo';
 import { Random } from 'meteor/random';
+import { EventEmitter } from 'events';
 
 const SUPPORTED_OPERATIONS = ['insert', 'update', 'replace', 'delete'];
 
-export class ChangeStreamObserveDriver {
+export class ChangeStreamObserveDriver extends EventEmitter {
   constructor(options) {
+    super();
     const self = this;
     
-    process.env.DEBUG && console.log('🔥 ChangeStreamObserveDriver: Creating new instance for collection:', options.cursorDescription.collectionName);
     
     this._usesChangeStreams = true;
     this._cursorDescription = options.cursorDescription;
     this._mongoHandle = options.mongoHandle;
     this._multiplexer = options.multiplexer;
     this._ordered = options.ordered;
-    this._changeStream = null;
+    this._changeStreams = new Map(); // Map para armazenar streams por operação
     this._stopped = false;
+    
+    // Rate limiting simples para evitar spam (sem batch processing)
+    this._lastEventTime = 0;
+    this._minEventInterval = 1; // 1ms mínimo entre eventos
     
     // Use the matcher passed from mongo_connection.js
     this._matcher = options.matcher;
@@ -39,8 +44,54 @@ export class ChangeStreamObserveDriver {
       this._projectionFn = (doc) => doc;
     }
     
-    process.env.DEBUG && console.log('🔥 ChangeStreamObserveDriver: Constructor complete, starting to watch...');
+    this._setupEventHandlers();
+    
     this._startWatching();
+  }
+
+  _setupEventHandlers() {
+    // Event handlers que processam eventos diretamente (sem batch)
+    this.on('insert', (data) => this._processEventDirect('insert', data));
+    this.on('update', (data) => this._processEventDirect('update', data));
+    this.on('replace', (data) => this._processEventDirect('replace', data));
+    this.on('delete', (data) => this._processEventDirect('delete', data));
+  }
+
+  _processEventDirect(operation, data) {
+    // Rate limiting simples para evitar spam
+    const now = Date.now();
+    
+    if (now - this._lastEventTime < this._minEventInterval) {
+      // Se muito rápido, processar no próximo tick (mas sem delay significativo)
+      setImmediate(() => this._handleEvent(operation, data));
+      return;
+    }
+    
+    this._lastEventTime = now;
+    
+    // Processar evento imediatamente (como oplog driver)
+    this._handleEvent(operation, data);
+  }
+
+  _handleEvent(operation, data) {
+    try {
+      switch (operation) {
+        case 'insert':
+          this._handleInsert(data.id, data.fullDocument);
+          break;
+        case 'update':
+          this._handleUpdate(data.id, data.fullDocument, data.fullDocumentBeforeChange);
+          break;
+        case 'replace':
+          this._handleReplace(data.id, data.fullDocument, data.fullDocumentBeforeChange);
+          break;
+        case 'delete':
+          this._handleDelete(data.id, data.fullDocumentBeforeChange);
+          break;
+      }
+    } catch (error) {
+      console.error(`Error processing ${operation} event:`, error);
+    }
   }
 
   async _startWatching() {
@@ -50,52 +101,151 @@ export class ChangeStreamObserveDriver {
     
     try {
       const collection = this._mongoHandle.rawCollection(this._cursorDescription.collectionName);
+      
       // Só envia os adds iniciais se o multiplexer ainda não estiver pronto
       if (!this._multiplexer._ready()) {
         await this._sendInitialAdds(collection);
       }
-      // Then start watching for changes
-      const pipeline = this._buildPipeline();
-      const changeStreamOptions = {
-        fullDocument: 'updateLookup',
-        fullDocumentBeforeChange: 'whenAvailable',
-      };
-      this._changeStream = collection.watch(pipeline, changeStreamOptions);
-      process.env.DEBUG && console.log('🔥 ChangeStream: Successfully created change stream for collection:', this._cursorDescription.collectionName);
-      process.env.DEBUG && console.log('🔥 ChangeStream: Pipeline:', JSON.stringify(pipeline, null, 2));
-      process.env.DEBUG && console.log('🔥 ChangeStream: Options:', JSON.stringify(changeStreamOptions, null, 2));
-      // Handle change events
-      this._changeStream.on('change', Meteor.bindEnvironment((change) => {
-        if (self._stopped) return;
-          console.log('🔥 ChangeStream: Received change event:', change);
-        self._handleChange(change);
-      }));
-      // Handle errors and reconnection
-      this._changeStream.on('error', Meteor.bindEnvironment((error) => {
-        if (self._stopped) return;
-        console.error('ChangeStream error:', error);
-        // Attempt to restart after a delay
-        setTimeout(() => {
-          if (!self._stopped) {
-            self._stopped = true;
-            self._restartChangeStream();
-          }
-        }, 1000);
-      }));
-      this._changeStream.on('close', Meteor.bindEnvironment(() => {
-        if (!self._stopped) {
-          // Unexpected close, attempt restart
-          setTimeout(() => {
-            if (!self._stopped) {
-              self._stopped = true;
-              self._restartChangeStream();
-            }
-          }, 1000);
-        }
-      }));
+      
+      // Criar um change stream para cada tipo de operação
+      await this._createOperationStreams(collection);
+      
+      console.log(`🔥 ChangeStream: Created ${this._changeStreams.size} operation-specific streams for ${this._cursorDescription.collectionName}`);
+      
     } catch (error) {
       console.error('Failed to start ChangeStream:', error);
       throw error;
+    }
+  }
+
+  async _createOperationStreams(collection) {
+    const self = this;
+    
+    // Criar streams para cada operação
+    for (const operation of SUPPORTED_OPERATIONS) {
+      try {
+        const pipeline = this._buildPipelineForOperation(operation);
+        const changeStreamOptions = {
+          fullDocument: operation === 'delete' ? 'default' : 'updateLookup',
+          fullDocumentBeforeChange: 'whenAvailable',
+        };
+
+        const changeStream = collection.watch(pipeline, changeStreamOptions);
+        
+        // Configurar handlers específicos para esta operação
+        this._setupStreamHandlers(changeStream, operation);
+        
+        // Armazenar o stream
+        this._changeStreams.set(operation, changeStream);
+        
+        
+      } catch (error) {
+        console.error(`Failed to create ${operation} stream:`, error);
+        throw error;
+      }
+    }
+  }
+
+  _buildPipelineForOperation(operation) {
+    // Pipeline específico para cada tipo de operação
+    const pipeline = [
+      {
+        $match: {
+          operationType: operation
+        }
+      }
+    ];
+
+    return pipeline;
+  }
+
+  _setupStreamHandlers(changeStream, operation) {
+    const self = this;
+
+    changeStream.on('change', Meteor.bindEnvironment((change) => {
+      if (self._stopped) return;
+      
+      
+      // Emitir evento interno específico para esta operação
+      self._emitOperationEvent(operation, change);
+    }));
+
+    changeStream.on('error', Meteor.bindEnvironment((error) => {
+      if (self._stopped) return;
+      console.error(`ChangeStream ${operation} error for ${self._cursorDescription.collectionName}:`, error);
+      
+      // Tentar restart após delay
+      setTimeout(() => {
+        if (!self._stopped) {
+          self._restartOperationStream(operation);
+        }
+      }, 1000);
+    }));
+
+    changeStream.on('close', Meteor.bindEnvironment(() => {
+      if (!self._stopped) {
+        console.warn(`ChangeStream ${operation} unexpectedly closed for ${self._cursorDescription.collectionName}`);
+        setTimeout(() => {
+          if (!self._stopped) {
+            self._restartOperationStream(operation);
+          }
+        }, 1000);
+      }
+    }));
+  }
+
+  _emitOperationEvent(operation, change) {
+    const { documentKey, fullDocument, fullDocumentBeforeChange } = change;
+    const id = documentKey._id;
+
+    // Preparar dados do evento
+    const eventData = {
+      id,
+      collection: this._cursorDescription.collectionName
+    };
+
+    // Adicionar dados específicos baseados no tipo de operação
+    switch (operation) {
+      case 'insert':
+        eventData.fullDocument = fullDocument;
+        break;
+      case 'update':
+      case 'replace':
+        eventData.fullDocument = fullDocument;
+        eventData.fullDocumentBeforeChange = fullDocumentBeforeChange;
+        eventData.updateDescription = change.updateDescription;
+        break;
+      case 'delete':
+        eventData.fullDocumentBeforeChange = fullDocumentBeforeChange;
+        break;
+    }
+
+    // Emitir evento interno (será processado diretamente)
+    this.emit(operation, eventData);
+  }
+
+  async _restartOperationStream(operation) {
+    try {
+      const stream = this._changeStreams.get(operation);
+      if (stream) {
+        await stream.close();
+      }
+
+      // Recriar o stream para esta operação
+      const collection = this._mongoHandle.rawCollection(this._cursorDescription.collectionName);
+      const pipeline = this._buildPipelineForOperation(operation);
+      const changeStreamOptions = {
+        fullDocument: operation === 'delete' ? 'default' : 'updateLookup',
+        fullDocumentBeforeChange: 'whenAvailable',
+      };
+
+      const newStream = collection.watch(pipeline, changeStreamOptions);
+      this._setupStreamHandlers(newStream, operation);
+      this._changeStreams.set(operation, newStream);
+      
+      console.log(`🔄 ChangeStream ${operation} successfully restarted for ${this._cursorDescription.collectionName}`);
+    } catch (error) {
+      console.error(`Failed to restart ${operation} ChangeStream:`, error);
     }
   }
 
@@ -118,30 +268,26 @@ export class ChangeStreamObserveDriver {
       const cursor = collection.find(selector, options);
       const docs = await cursor.toArray();
       
-      // console.log(`📊 INITIAL DATA: Found ${docs.length} initial documents for ${this._cursorDescription.collectionName}`);
-      
       // Send 'added' for each existing document that matches our matcher
       for (const doc of docs) {
         if (this._stopped) return;
         
         if (this._matcher && this._matcher.documentMatches(doc).result) {
           const projectedDoc = this._projectionFn ? this._projectionFn(doc) : doc;
-          // console.log('📊 INITIAL DATA: Calling multiplexer.added() with:', { id: doc._id, title: doc.title || 'no title' });
           this._multiplexer.added(doc._id, projectedDoc);
         } else if (!this._matcher) {
           // If no matcher, include all documents
           const projectedDoc = this._projectionFn ? this._projectionFn(doc) : doc;
-          // console.log('📊 INITIAL DATA: Calling multiplexer.added() (no matcher) with:', { id: doc._id, title: doc.title || 'no title' });
           this._multiplexer.added(doc._id, projectedDoc);
         }
       }
       
-      // Mark that initial adds are complete, mas só se ainda não estiver pronto
+      // Mark that initial adds are complete
       if (!this._multiplexer._ready()) {
         this._multiplexer.ready();
-        console.log(`ChangeStream: Initial adds complete for ${this._cursorDescription.collectionName}`);
+        console.log(`ChangeStream: Initial adds complete for ${this._cursorDescription.collectionName} (${docs.length} docs)`);
       } else {
-        console.warn(`ChangeStream: Multiplexer já estava pronto ao tentar marcar como ready para ${this._cursorDescription.collectionName}`);
+        console.warn(`ChangeStream: Multiplexer already ready for ${this._cursorDescription.collectionName}`);
       }
       
     } catch (error) {
@@ -150,76 +296,20 @@ export class ChangeStreamObserveDriver {
     }
   }
 
-  async _restartChangeStream() {
-    try {
-      if (this._changeStream) {
-        await this._changeStream.close();
-      }
-      await this._startWatching();
-    } catch (error) {
-      console.error('Failed to restart ChangeStream:', error);
-    }
-  }
-
-  _buildPipeline() {
-    // For now, use a simple pipeline that watches all operations
-    // We'll filter using our matcher in _handleChange
-    const selector = this._cursorDescription.selector;
-    
-    if (!selector || Object.keys(selector).length === 0) {
-      // No selector, watch all changes
-      return [];
-    }
-    
-    // Simple pipeline that just filters by operation type
-    // More complex selector filtering will be done in _handleChange
-    return [
-      {
-        $match: {
-          operationType: { $in: ['insert', 'update', 'replace', 'delete'] }
-        }
-      }
-    ];
-  }
-
-  _handleChange(change) {
-    if (this._stopped) return;
-    
-    const { operationType, documentKey, fullDocument, fullDocumentBeforeChange } = change;
-    
-    if (!SUPPORTED_OPERATIONS.includes(operationType)) {
-      return; // Ignore unsupported operations
-    }
-    
-    const id = documentKey._id;
-    
-    try {
-      switch (operationType) {
-        case 'insert':
-          this._handleInsert(id, fullDocument);
-          break;
-        case 'update':
-          this._handleUpdate(id, fullDocument, fullDocumentBeforeChange);
-          break;
-        case 'replace':
-          this._handleReplace(id, fullDocument, fullDocumentBeforeChange);
-          break;
-        case 'delete':
-          this._handleDelete(id, fullDocumentBeforeChange);
-          break;
-      }
-    } catch (error) {
-      console.error('Error handling change stream event:', error);
-    }
-  }
+  // Event handlers
 
   _handleInsert(id, doc) {
     // Apply projection and check if document matches our criteria
     const matches = this._matcher ? this._matcher.documentMatches(doc).result : true;
-    process.env.DEBUG && console.log(`🔥 ChangeStream INSERT: ID=${id}, matches=${matches}, collection=${this._cursorDescription.collectionName}`);
     if (matches) {
       const projectedDoc = this._projectionFn ? this._projectionFn(doc) : doc;
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.added() with:', { id, projectedDoc });
+      // Medir latência de notificação do Change Stream
+      if (doc.createdAt) {
+        const now = Date.now();
+        const insertedAt = new Date(doc.createdAt).getTime();
+        const latencyMs = now - insertedAt;
+        console.log(`⏱️ ChangeStream INSERT latency: ${latencyMs} ms (ID: ${id})`);
+      }
       this._multiplexer.added(id, projectedDoc);
     }
   }
@@ -228,21 +318,17 @@ export class ChangeStreamObserveDriver {
     const matchesAfter = this._matcher ? this._matcher.documentMatches(docAfter || {}).result : true;
     const matchesBefore = (docBefore && this._matcher) ? this._matcher.documentMatches(docBefore).result : false;
     
-    process.env.DEBUG && console.log(`🔥 ChangeStream UPDATE: ID=${id}, matchesAfter=${matchesAfter}, matchesBefore=${matchesBefore}, collection=${this._cursorDescription.collectionName}`);
     
     if (matchesAfter && matchesBefore) {
       // Document matched before and after - it's a change
       const projectedDoc = this._projectionFn ? this._projectionFn(docAfter) : docAfter;
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.changed() with:', { id, projectedDoc });
       this._multiplexer.changed(id, projectedDoc);
     } else if (matchesAfter && !matchesBefore) {
       // Document didn't match before but matches now - it's an add
       const projectedDoc = this._projectionFn ? this._projectionFn(docAfter) : docAfter;
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.added() (from update) with:', { id, projectedDoc });
       this._multiplexer.added(id, projectedDoc);
     } else if (!matchesAfter && matchesBefore) {
       // Document matched before but doesn't match now - it's a remove
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.removed() (from update) with:', { id });
       this._multiplexer.removed(id);
     }
     // If neither matches before nor after, ignore
@@ -254,15 +340,12 @@ export class ChangeStreamObserveDriver {
   }
 
   _handleDelete(id, docBefore) {
-    process.env.DEBUG && console.log(`🔥 ChangeStream DELETE: ID=${id}, hasDocBefore=${!!docBefore}, collection=${this._cursorDescription.collectionName}`);
     // For deletes, we only care if the document was in our result set before
     if (docBefore && this._matcher && this._matcher.documentMatches(docBefore).result) {
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.removed() with:', { id });
       this._multiplexer.removed(id);
     } else if (!docBefore || !this._matcher) {
       // If we don't have the before document or no matcher, assume it might have been in our set
       // This is a limitation - we might send unnecessary removes
-      process.env.DEBUG && console.log('🔥 ChangeStream: Calling multiplexer.removed() (fallback) with:', { id });
       this._multiplexer.removed(id);
     }
   }
@@ -272,13 +355,31 @@ export class ChangeStreamObserveDriver {
     
     this._stopped = true;
     
-    if (this._changeStream) {
+    // Fechar todos os change streams
+    for (const [operation, stream] of this._changeStreams) {
       try {
-        await this._changeStream.close();
+        await stream.close();
       } catch (error) {
-        // Ignore errors when closing
+        console.error(`Error closing ${operation} stream:`, error);
       }
-      this._changeStream = null;
     }
+    
+    this._changeStreams.clear();
+    
+    // Remover todos os event listeners
+    this.removeAllListeners();
+  }
+
+  // Método para debug - ver status dos streams
+  getStreamsStatus() {
+    const status = [];
+    for (const [operation, stream] of this._changeStreams) {
+      status.push({
+        operation,
+        closed: stream.closed || false,
+        collection: this._cursorDescription.collectionName,
+      });
+    }
+    return status;
   }
 }
