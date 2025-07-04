@@ -16,27 +16,27 @@ export class ChangeStreamObserveDriver extends EventEmitter {
     this._mongoHandle = options.mongoHandle;
     this._multiplexer = options.multiplexer;
     this._ordered = options.ordered;
-    this._changeStreams = new Map(); // Map para armazenar streams por operação
+  this._changeStreams = new Map(); // Map to store streams by operation
     this._stopped = false;
     
-    // Rate limiting simples para evitar spam (sem batch processing)
+  // Simple rate limiting to avoid spam (no batch processing)
     this._lastEventTime = 0;
     this._minEventInterval = 1; // 1ms mínimo entre eventos
     
     // Use the matcher passed from mongo_connection.js
     this._matcher = options.matcher;
     
-    // Fallback: create matcher if not provided
+  // Fallback: create matcher if not provided
     if (!this._matcher) {
       // Import Minimongo locally to avoid circular dependencies
       const { Minimongo } = require('meteor/minimongo');
       this._matcher = new Minimongo.Matcher(this._cursorDescription.selector);
     }
     
-    // For debugging
+  // For debugging
     this._id = options.id || Random.id();
     
-    // Projection function similar to oplog driver
+  // Projection function similar to oplog driver
     const projection = this._cursorDescription.options.projection || this._cursorDescription.options.fields;
     if (projection) {
       this._projectionFn = LocalCollection._compileProjection(projection);
@@ -50,7 +50,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   }
 
   _setupEventHandlers() {
-    // Event handlers que processam eventos diretamente (sem batch)
+  // Event handlers that process events directly (no batch)
     this.on('insert', (data) => this._processEventDirect('insert', data));
     this.on('update', (data) => this._processEventDirect('update', data));
     this.on('replace', (data) => this._processEventDirect('replace', data));
@@ -58,18 +58,18 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   }
 
   _processEventDirect(operation, data) {
-    // Rate limiting simples para evitar spam
+  // Simple rate limiting to avoid spam
     const now = Date.now();
     
     if (now - this._lastEventTime < this._minEventInterval) {
-      // Se muito rápido, processar no próximo tick (mas sem delay significativo)
+  // If too fast, process on next tick (but without significant delay)
       setImmediate(() => this._handleEvent(operation, data));
       return;
     }
     
     this._lastEventTime = now;
     
-    // Processar evento imediatamente (como oplog driver)
+  // Process event immediately (like oplog driver)
     this._handleEvent(operation, data);
   }
 
@@ -102,12 +102,12 @@ export class ChangeStreamObserveDriver extends EventEmitter {
     try {
       const collection = this._mongoHandle.rawCollection(this._cursorDescription.collectionName);
       
-      // Só envia os adds iniciais se o multiplexer ainda não estiver pronto
+  // Only send initial adds if the multiplexer is not ready yet
       if (!this._multiplexer._ready()) {
         await this._sendInitialAdds(collection);
       }
       
-      // Criar um change stream para cada tipo de operação
+  // Create a change stream for each operation type
       await this._createOperationStreams(collection);
       
       console.log(`🔥 ChangeStream: Created ${this._changeStreams.size} operation-specific streams for ${this._cursorDescription.collectionName}`);
@@ -121,7 +121,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   async _createOperationStreams(collection) {
     const self = this;
     
-    // Criar streams para cada operação
+  // Create streams for each operation
     for (const operation of SUPPORTED_OPERATIONS) {
       try {
         const pipeline = this._buildPipelineForOperation(operation);
@@ -132,10 +132,10 @@ export class ChangeStreamObserveDriver extends EventEmitter {
 
         const changeStream = collection.watch(pipeline, changeStreamOptions);
         
-        // Configurar handlers específicos para esta operação
+  // Set up handlers specific to this operation
         this._setupStreamHandlers(changeStream, operation);
         
-        // Armazenar o stream
+  // Store the stream
         this._changeStreams.set(operation, changeStream);
         
         
@@ -147,7 +147,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   }
 
   _buildPipelineForOperation(operation) {
-    // Pipeline específico para cada tipo de operação
+  // Pipeline specific for each operation type
     const pipeline = [
       {
         $match: {
@@ -164,9 +164,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
 
     changeStream.on('change', Meteor.bindEnvironment((change) => {
       if (self._stopped) return;
-      
-      
-      // Emitir evento interno específico para esta operação
+      // Emit internal event specific to this operation
       self._emitOperationEvent(operation, change);
     }));
 
@@ -174,7 +172,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
       if (self._stopped) return;
       console.error(`ChangeStream ${operation} error for ${self._cursorDescription.collectionName}:`, error);
       
-      // Tentar restart após delay
+  // Try to restart after a delay
       setTimeout(() => {
         if (!self._stopped) {
           self._restartOperationStream(operation);
@@ -198,13 +196,13 @@ export class ChangeStreamObserveDriver extends EventEmitter {
     const { documentKey, fullDocument, fullDocumentBeforeChange } = change;
     const id = documentKey._id;
 
-    // Preparar dados do evento
+  // Prepare event data
     const eventData = {
       id,
       collection: this._cursorDescription.collectionName
     };
 
-    // Adicionar dados específicos baseados no tipo de operação
+  // Add specific data based on the operation type
     switch (operation) {
       case 'insert':
         eventData.fullDocument = fullDocument;
@@ -220,7 +218,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
         break;
     }
 
-    // Emitir evento interno (será processado diretamente)
+  // Emit internal event (will be processed directly)
     this.emit(operation, eventData);
   }
 
@@ -231,7 +229,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
         await stream.close();
       }
 
-      // Recriar o stream para esta operação
+  // Recreate the stream for this operation
       const collection = this._mongoHandle.rawCollection(this._cursorDescription.collectionName);
       const pipeline = this._buildPipelineForOperation(operation);
       const changeStreamOptions = {
@@ -251,27 +249,21 @@ export class ChangeStreamObserveDriver extends EventEmitter {
 
   async _sendInitialAdds(collection) {
     if (this._stopped) return;
-    
     try {
       // Build the same selector and options that the cursor would use
       const selector = this._cursorDescription.selector || {};
       const options = { ...this._cursorDescription.options };
-      
       // Remove some options that don't apply to find()
       delete options.tailable;
       delete options.oplogReplay;
-      
       console.log(`ChangeStream: Sending initial adds for collection ${this._cursorDescription.collectionName}`);
       console.log(`ChangeStream: Selector:`, selector);
-      
       // Find all existing documents
       const cursor = collection.find(selector, options);
       const docs = await cursor.toArray();
-      
       // Send 'added' for each existing document that matches our matcher
       for (const doc of docs) {
         if (this._stopped) return;
-        
         if (this._matcher && this._matcher.documentMatches(doc).result) {
           const projectedDoc = this._projectionFn ? this._projectionFn(doc) : doc;
           this._multiplexer.added(doc._id, projectedDoc);
@@ -281,7 +273,6 @@ export class ChangeStreamObserveDriver extends EventEmitter {
           this._multiplexer.added(doc._id, projectedDoc);
         }
       }
-      
       // Mark that initial adds are complete
       if (!this._multiplexer._ready()) {
         this._multiplexer.ready();
@@ -289,7 +280,6 @@ export class ChangeStreamObserveDriver extends EventEmitter {
       } else {
         console.warn(`ChangeStream: Multiplexer already ready for ${this._cursorDescription.collectionName}`);
       }
-      
     } catch (error) {
       console.error('Error sending initial adds for ChangeStream:', error);
       throw error;
@@ -299,11 +289,11 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   // Event handlers
 
   _handleInsert(id, doc) {
-    // Apply projection and check if document matches our criteria
+  // Apply projection and check if document matches our criteria
     const matches = this._matcher ? this._matcher.documentMatches(doc).result : true;
     if (matches) {
       const projectedDoc = this._projectionFn ? this._projectionFn(doc) : doc;
-      // Medir latência de notificação do Change Stream
+  // Measure Change Stream notification latency
       if (doc.createdAt) {
         const now = Date.now();
         const insertedAt = new Date(doc.createdAt).getTime();
@@ -335,17 +325,17 @@ export class ChangeStreamObserveDriver extends EventEmitter {
   }
 
   _handleReplace(id, docAfter, docBefore) {
-    // Handle replace similar to update
+  // Handle replace similar to update
     this._handleUpdate(id, docAfter, docBefore);
   }
 
   _handleDelete(id, docBefore) {
-    // For deletes, we only care if the document was in our result set before
+  // For deletes, we only care if the document was in our result set before
     if (docBefore && this._matcher && this._matcher.documentMatches(docBefore).result) {
       this._multiplexer.removed(id);
     } else if (!docBefore || !this._matcher) {
-      // If we don't have the before document or no matcher, assume it might have been in our set
-      // This is a limitation - we might send unnecessary removes
+  // If we don't have the before document or no matcher, assume it might have been in our set
+  // This is a limitation - we might send unnecessary removes
       this._multiplexer.removed(id);
     }
   }
@@ -355,7 +345,7 @@ export class ChangeStreamObserveDriver extends EventEmitter {
     
     this._stopped = true;
     
-    // Fechar todos os change streams
+  // Close all change streams
     for (const [operation, stream] of this._changeStreams) {
       try {
         await stream.close();
@@ -366,11 +356,11 @@ export class ChangeStreamObserveDriver extends EventEmitter {
     
     this._changeStreams.clear();
     
-    // Remover todos os event listeners
+  // Remove all event listeners
     this.removeAllListeners();
   }
 
-  // Método para debug - ver status dos streams
+  // Debug method - view status of streams
   getStreamsStatus() {
     const status = [];
     for (const [operation, stream] of this._changeStreams) {
