@@ -233,10 +233,19 @@ export class EventObserveDriver extends EventEmitter {
 // Measure notification latency of the Event System
 // Apply projection and check if document matches our criteria
       if (doc.createdAt) {
+        // createdAt, receivedAt, emitedAt
         const now = Date.now();
         const insertedAt = new Date(doc.createdAt).getTime();
+        const receivedAt = new Date(doc.docReceivedAt).getTime();
+        const emitedAt = new Date(doc.emittedAt).getTime();
         const latencyMs = now - insertedAt;
+        const latencyReceivedMs = now - receivedAt;
+        const latencyEmitedMs = now - emitedAt;
         console.log(`⏱️ EventDriver INSERT latency: ${latencyMs} ms (ID: ${id})`);
+        console.log(`⏱️ EventDriver INSERT latency received: ${latencyReceivedMs} ms (ID: ${id})`);
+        console.log(`⏱️ EventDriver INSERT latency emited: ${latencyEmitedMs} ms (ID: ${id})`);
+        console.log(`--------------------------------`);
+
       }
 
       this._multiplexer.added(id, projectedDoc);

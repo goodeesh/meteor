@@ -571,7 +571,7 @@ Object.assign(OplogObserveDriver.prototype, {
       const now = Date.now();
       const insertedAt = new Date(newDoc.createdAt).getTime();
       const latencyMs = now - insertedAt;
-      console.log(`⏱️ EventDriver INSERT latency: ${latencyMs} ms (ID: ${id})`);
+      console.log(`⏱️ Oplog INSERT latency: ${latencyMs} ms (ID: ${id})`);
     }
     var self = this;
     Meteor._noYieldsAllowed(function () {

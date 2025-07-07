@@ -166,7 +166,7 @@ MongoConnection.prototype.insertAsync = async function (collection_name, documen
   const self = this;
 
   // DEBUG purposes
-  document.createdAt = new Date();
+  document.docReceivedAt = new Date();
 
   if (collection_name === "___meteor_failure_test_collection") {
     const e = new Error("Failure test");
@@ -183,12 +183,16 @@ MongoConnection.prototype.insertAsync = async function (collection_name, documen
   var refresh = async function () {
     await Meteor.refresh({collection: collection_name, id: document._id });
   };
+
+  document.createdAt = new Date();
   return self.rawCollection(collection_name).insertOne(
     replaceTypes(document, replaceMeteorAtomWithMongo),
     {
       safe: true,
     }
   ).then(async ({insertedId}) => {
+      document.emittedAt = new Date();
+
       emitDatabaseEvent(collection_name, 'insert', {
       id: document._id,
       document: document
