@@ -43,15 +43,6 @@ export class EventObserveDriver extends EventEmitter {
     this._ordered = options.ordered;
     this._stopped = false;
     
-    // Rate limiting simples para evitar spam (sem batch processing)
-// Simple rate limiting to avoid spam (no batch processing)
-    this._lastEventTime = {
-      insert: 0,
-      update: 0,
-      delete: 0
-    };
-    this._minEventInterval = 1; // 1ms mínimo entre eventos do mesmo tipo
-    
     // Use the matcher passed from mongo_connection.js
     this._matcher = options.matcher;
     
@@ -93,19 +84,6 @@ export class EventObserveDriver extends EventEmitter {
   }
 
   _processEventDirect(operation, data) {
-    // Rate limiting simples para evitar spam
-// Simple rate limiting to avoid spam
-    const now = Date.now();
-    const eventType = operation === 'replace' ? 'update' : operation;
-    
-    if (now - this._lastEventTime[eventType] < this._minEventInterval) {
-  // If too fast, process on the next tick (but without significant delay)
-      setImmediate(() => this._handleEvent(operation, data));
-      return;
-    }
-    
-    this._lastEventTime[eventType] = now;
-    
     // Processar evento imediatamente (como oplog driver)
 // Process event immediately (like oplog driver)
     this._handleEvent(operation, data);

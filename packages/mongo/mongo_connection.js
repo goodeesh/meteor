@@ -1050,7 +1050,7 @@ Object.assign(MongoConnection.prototype, {
           }
         }
       ].every(f => f());  // invoke each function and check if all return true
-
+      
       // Choose driver in order of preference: EventDriver > Oplog > Polling
       var driverClass;
       if (process.env.MONGO_OBSERVE_DRIVER === 'event') {
