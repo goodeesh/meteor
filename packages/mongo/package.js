@@ -95,7 +95,6 @@ Package.onUse(function (api) {
       "mongo_common.js",
       "asynchronous_cursor.js",
       "cursor.ts",
-      "changestream_observe_driver.js",
     ],
     "server"
   );
