@@ -248,10 +248,14 @@ if (module.hot) {
     ? `/* Entry to Meteor ${side} app */
 import '../${config?.entryFile}';`
     : role === FILE_ROLE.build || role === FILE_ROLE.run && config?.isServer
-      ? `/* Entry to Rspack ${side} app */
+      ? `/* Link to Rspack ${side} app */
 import './${config?.outputFile || ''}';`
       : role === FILE_ROLE.run && config?.isClient
-      ? '/* No import as served by Rspack HMR server */'
+      ? '/* No link to Rspack client app as served by HMR server */'
+      : role === FILE_ROLE.output && config?.isClient
+      ? '/* No code generated for Rspack client app as served by HMR server */'
+      : role === FILE_ROLE.output && config?.isServer
+      ? '/* Code generated for Rspack server app */'
       : '';
 
   return `${banner}
