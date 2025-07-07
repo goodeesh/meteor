@@ -8,6 +8,35 @@ import { Cursor } from './cursor';
 import LocalCollection from 'meteor/minimongo/local_collection';
 import { idForOp } from './oplog_tailing';
 
+// Helper function for structured logging throughout the oplog flow
+const logOplogFlow = (stage, data) => {
+  if(!process.env.DEBUG) return;
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    stage,
+    ...data
+  };
+  
+  // Use different colors for different stages
+  const stageColors = {
+    'OPLOG_ENTRY_RECEIVED': '🔵',
+    'OPLOG_ENTRY_PROCESSING': '🟡',
+    'DOCUMENT_MATCHING': '🟢',
+    'DOCUMENT_PUBLISHED': '🟣',
+    'DOCUMENT_BUFFERED': '🟠',
+    'DOCUMENT_REMOVED': '🔴',
+    'MULTIPLEXER_CALLBACK': '⚡',
+    'PHASE_CHANGE': '🔄',
+    'FETCH_INITIATED': '⏬',
+    'FETCH_COMPLETED': '✅',
+    'ERROR': '❌'
+  };
+  
+  const icon = stageColors[stage] || '📋';
+  console.log(`${icon} [OplogFlow] ${stage}:`, JSON.stringify(logEntry, null, 2));
+};
+
 var PHASE = {
   QUERYING: "QUERYING",
   FETCHING: "FETCHING",
@@ -148,13 +177,38 @@ Object.assign(OplogObserveDriver.prototype, {
         trigger, function (notification) {
           finishIfNeedToPollQuery(function () {
             const op = notification.op;
+            
+            // Log oplog entry received
+            logOplogFlow('OPLOG_ENTRY_RECEIVED', {
+              driverId: self._id,
+              collectionName: self._cursorDescription.collectionName,
+              operation: op.op,
+              docId: idForOp(op),
+              phase: self._phase,
+              isDropOperation: notification.dropCollection || notification.dropDatabase,
+              timestamp: op.ts ? new Date(op.ts.getHighBits() * 1000).toISOString() : 'unknown'
+            });
+            
             if (notification.dropCollection || notification.dropDatabase) {
               // Note: this call is not allowed to block on anything (especially
               // on waiting for oplog entries to catch up) because that will block
               // onOplogEntry!
+              logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+                driverId: self._id,
+                action: 'NEED_TO_POLL_QUERY',
+                reason: 'Drop collection/database detected'
+              });
               return self._needToPollQuery();
             } else {
               // All other operators should be handled depending on phase
+              logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+                driverId: self._id,
+                phase: self._phase,
+                operation: op.op,
+                docId: idForOp(op),
+                handlerFunction: self._phase === PHASE.QUERYING ? '_handleOplogEntryQuerying' : '_handleOplogEntrySteadyOrFetching'
+              });
+              
               if (self._phase === PHASE.QUERYING) {
                 return self._handleOplogEntryQuerying(op);
               } else {
@@ -225,7 +279,28 @@ Object.assign(OplogObserveDriver.prototype, {
       var fields = Object.assign({}, doc);
       delete fields._id;
       self._published.set(id, self._sharedProjectionFn(doc));
+      
+      // Log document being published
+      logOplogFlow('DOCUMENT_PUBLISHED', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        action: 'ADDED',
+        publishedSetSize: self._published.size(),
+        fields: Object.keys(fields)
+      });
+      
       self._multiplexer.added(id, self._projectionFn(fields));
+      
+      // Log multiplexer callback
+      logOplogFlow('MULTIPLEXER_CALLBACK', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        callback: 'added',
+        functionName: '_addPublished'
+      });
 
       // After adding this document, the published set might be overflowed
       // (exceeding capacity specified by limit). If so, push the maximum
@@ -255,8 +330,27 @@ Object.assign(OplogObserveDriver.prototype, {
   _removePublished: function (id) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
+      // Log document being removed from published set
+      logOplogFlow('DOCUMENT_PUBLISHED', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        action: 'REMOVED',
+        publishedSetSizeBefore: self._published.size()
+      });
+      
       self._published.remove(id);
       self._multiplexer.removed(id);
+      
+      // Log multiplexer callback
+      logOplogFlow('MULTIPLEXER_CALLBACK', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        callback: 'removed',
+        functionName: '_removePublished'
+      });
       if (! self._limit || self._published.size() === self._limit)
         return;
 
@@ -311,18 +405,62 @@ Object.assign(OplogObserveDriver.prototype, {
       var projectedOld = self._projectionFn(oldDoc);
       var changed = DiffSequence.makeChangedFields(
         projectedNew, projectedOld);
-      if (!isEmpty(changed))
+      
+      // Log document being changed in published set
+      logOplogFlow('DOCUMENT_PUBLISHED', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        action: 'CHANGED',
+        changedFields: Object.keys(changed),
+        hasChanges: !isEmpty(changed)
+      });
+        
+      if (!isEmpty(changed)) {
         self._multiplexer.changed(id, changed);
+        
+        // Log multiplexer callback
+        logOplogFlow('MULTIPLEXER_CALLBACK', {
+          driverId: self._id,
+          collectionName: self._cursorDescription.collectionName,
+          docId: id,
+          callback: 'changed',
+          functionName: '_changePublished',
+          changedFields: Object.keys(changed)
+        });
+      }
     });
   },
   _addBuffered: function (id, doc) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
+      // Log document being buffered
+      logOplogFlow('DOCUMENT_BUFFERED', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        action: 'ADDED',
+        bufferSizeBefore: self._unpublishedBuffer.size(),
+        limit: self._limit
+      });
+      
       self._unpublishedBuffer.set(id, self._sharedProjectionFn(doc));
 
       // If something is overflowing the buffer, we just remove it from cache
       if (self._unpublishedBuffer.size() > self._limit) {
         var maxBufferedId = self._unpublishedBuffer.maxElementId();
+
+        logOplogFlow('DOCUMENT_BUFFERED', {
+          driverId: self._id,
+          collectionName: self._cursorDescription.collectionName,
+          docId: maxBufferedId,
+          phase: self._phase,
+          action: 'OVERFLOW_REMOVED',
+          bufferSize: self._unpublishedBuffer.size(),
+          limit: self._limit
+        });
 
         self._unpublishedBuffer.remove(maxBufferedId);
 
@@ -337,12 +475,31 @@ Object.assign(OplogObserveDriver.prototype, {
   _removeBuffered: function (id) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
+      // Log document being removed from buffer
+      logOplogFlow('DOCUMENT_BUFFERED', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        action: 'REMOVED',
+        bufferSizeBefore: self._unpublishedBuffer.size(),
+        safeAppendToBuffer: self._safeAppendToBuffer
+      });
+      
       self._unpublishedBuffer.remove(id);
       // To keep the contract "buffer is never empty in STEADY phase unless the
       // everything matching fits into published" true, we poll everything as
       // soon as we see the buffer becoming empty.
-      if (! self._unpublishedBuffer.size() && ! self._safeAppendToBuffer)
+      if (! self._unpublishedBuffer.size() && ! self._safeAppendToBuffer) {
+        logOplogFlow('DOCUMENT_BUFFERED', {
+          driverId: self._id,
+          collectionName: self._cursorDescription.collectionName,
+          phase: self._phase,
+          action: 'BUFFER_EMPTY_POLL_QUERY',
+          reason: 'Buffer became empty and safeAppendToBuffer is false'
+        });
         self._needToPollQuery();
+      }
     });
   },
   // Called when a document has joined the "Matching" results set.
@@ -410,7 +567,7 @@ Object.assign(OplogObserveDriver.prototype, {
     });
   },
   _handleDoc: function (id, newDoc) {
-    if (newDoc.createdAt) {
+    if (newDoc && newDoc.createdAt) {
       const now = Date.now();
       const insertedAt = new Date(newDoc.createdAt).getTime();
       const latencyMs = now - insertedAt;
@@ -423,6 +580,21 @@ Object.assign(OplogObserveDriver.prototype, {
       var publishedBefore = self._published.has(id);
       var bufferedBefore = self._limit && self._unpublishedBuffer.has(id);
       var cachedBefore = publishedBefore || bufferedBefore;
+
+      // Log document handling decision
+      logOplogFlow('DOCUMENT_MATCHING', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        matchesNow,
+        publishedBefore,
+        bufferedBefore,
+        cachedBefore,
+        action: matchesNow && !cachedBefore ? 'ADD_MATCHING' : 
+                cachedBefore && !matchesNow ? 'REMOVE_MATCHING' : 
+                cachedBefore && matchesNow ? 'UPDATE_MATCHING' : 'NO_ACTION'
+      });
 
       if (matchesNow && !cachedBefore) {
         self._addMatching(newDoc);
@@ -531,6 +703,16 @@ Object.assign(OplogObserveDriver.prototype, {
         self._currentlyFetching = self._needToFetch;
         var thisGeneration = ++self._fetchGeneration;
         self._needToFetch = new LocalCollection._IdMap;
+        
+        // Log fetch initiation
+        logOplogFlow('FETCH_INITIATED', {
+          driverId: self._id,
+          collectionName: self._cursorDescription.collectionName,
+          phase: self._phase,
+          documentsToFetch: self._currentlyFetching.size(),
+          fetchGeneration: thisGeneration,
+          functionName: '_fetchModifiedDocuments'
+        });
 
         // Create an array of promises for all the fetch operations
         const fetchPromises = [];
@@ -585,10 +767,29 @@ Object.assign(OplogObserveDriver.prototype, {
             .filter(result => result.status === 'rejected')
             .map(result => result.reason);
 
+          // Log fetch completion
+          logOplogFlow('FETCH_COMPLETED', {
+            driverId: self._id,
+            collectionName: self._cursorDescription.collectionName,
+            phase: self._phase,
+            totalFetches: results.length,
+            successfulFetches: results.filter(r => r.status === 'fulfilled').length,
+            failedFetches: errors.length,
+            fetchGeneration: thisGeneration,
+            functionName: '_fetchModifiedDocuments'
+          });
+
           if (errors.length > 0) {
             Meteor._debug('Some fetch queries failed:', errors);
           }
         } catch (err) {
+          logOplogFlow('ERROR', {
+            driverId: self._id,
+            collectionName: self._cursorDescription.collectionName,
+            phase: self._phase,
+            error: err.message,
+            functionName: '_fetchModifiedDocuments'
+          });
           Meteor._debug('Got an exception in a fetch query', err);
         }
         // Exit now if we've had a _pollQuery call (here or in another fiber).
@@ -620,28 +821,78 @@ Object.assign(OplogObserveDriver.prototype, {
   _handleOplogEntryQuerying: function (op) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
-      self._needToFetch.set(idForOp(op), op);
+      var id = idForOp(op);
+      
+      // Log querying phase oplog entry handling
+      logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        operation: op.op,
+        phase: self._phase,
+        action: 'QUEUED_FOR_FETCH',
+        functionName: '_handleOplogEntryQuerying'
+      });
+      
+      self._needToFetch.set(id, op);
     });
   },
   _handleOplogEntrySteadyOrFetching: function (op) {
     var self = this;
     Meteor._noYieldsAllowed(function () {
       var id = idForOp(op);
+      
+      // Log detailed oplog entry processing
+      logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        docId: id,
+        phase: self._phase,
+        operation: op.op,
+        functionName: '_handleOplogEntrySteadyOrFetching',
+        isCurrentlyFetching: self._phase === PHASE.FETCHING && self._currentlyFetching && self._currentlyFetching.has(id),
+        isInNeedToFetch: self._needToFetch.has(id)
+      });
+      
       // If we're already fetching this one, or about to, we can't optimize;
       // make sure that we fetch it again if necessary.
 
       if (self._phase === PHASE.FETCHING &&
           ((self._currentlyFetching && self._currentlyFetching.has(id)) ||
            self._needToFetch.has(id))) {
+        logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+          driverId: self._id,
+          docId: id,
+          action: 'DEFER_TO_FETCH',
+          reason: 'Already fetching or queued for fetch'
+        });
         self._needToFetch.set(id, op);
         return;
       }
 
       if (op.op === 'd') {
+        logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+          driverId: self._id,
+          docId: id,
+          operation: 'DELETE',
+          isPublished: self._published.has(id),
+          isBuffered: self._limit && self._unpublishedBuffer.has(id),
+          willRemove: self._published.has(id) || (self._limit && self._unpublishedBuffer.has(id))
+        });
+        
         if (self._published.has(id) ||
             (self._limit && self._unpublishedBuffer.has(id)))
           self._removeMatching(id);
       } else if (op.op === 'i') {
+        logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+          driverId: self._id,
+          docId: id,
+          operation: 'INSERT',
+          isPublished: self._published.has(id),
+          isBuffered: self._unpublishedBuffer && self._unpublishedBuffer.has(id),
+          documentMatches: self._matcher.documentMatches(op.o).result
+        });
+        
         if (self._published.has(id))
           throw new Error("insert found for already-existing ID in published");
         if (self._unpublishedBuffer && self._unpublishedBuffer.has(id))
@@ -671,6 +922,17 @@ Object.assign(OplogObserveDriver.prototype, {
 
         var publishedBefore = self._published.has(id);
         var bufferedBefore = self._limit && self._unpublishedBuffer.has(id);
+        
+        logOplogFlow('OPLOG_ENTRY_PROCESSING', {
+          driverId: self._id,
+          docId: id,
+          operation: 'UPDATE',
+          isReplace,
+          canDirectlyModifyDoc,
+          publishedBefore,
+          bufferedBefore,
+          modifier: isReplace ? 'replacement' : Object.keys(op.o)
+        });
 
         if (isReplace) {
           self._handleDoc(id, Object.assign({_id: id}, op.o));
@@ -1019,6 +1281,16 @@ Object.assign(OplogObserveDriver.prototype, {
         Package['facts-base'] && Package['facts-base'].Facts.incrementServerFact(
           "mongo-livedata", "time-spent-in-" + self._phase + "-phase", timeDiff);
       }
+
+      // Log phase change
+      logOplogFlow('PHASE_CHANGE', {
+        driverId: self._id,
+        collectionName: self._cursorDescription.collectionName,
+        fromPhase: self._phase,
+        toPhase: phase,
+        timeInPreviousPhase: self._phase ? (now - self._phaseStartTime) : 0,
+        functionName: '_registerPhaseChange'
+      });
 
       self._phase = phase;
       self._phaseStartTime = now;
