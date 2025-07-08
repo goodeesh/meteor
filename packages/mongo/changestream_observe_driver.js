@@ -111,9 +111,6 @@ export class ChangeStreamObserveDriver {
       delete options.tailable;
       delete options.oplogReplay;
       
-      console.log(`ChangeStream: Sending initial adds for collection ${this._cursorDescription.collectionName}`);
-      console.log(`ChangeStream: Selector:`, selector);
-      
       // Find all existing documents
       const cursor = collection.find(selector, options);
       const docs = await cursor.toArray();
@@ -134,8 +131,6 @@ export class ChangeStreamObserveDriver {
       
       // Mark that initial adds are complete
       this._multiplexer.ready();
-      console.log(`ChangeStream: Initial adds complete for ${this._cursorDescription.collectionName}`);
-      
     } catch (error) {
       console.error('Error sending initial adds for ChangeStream:', error);
       throw error;
