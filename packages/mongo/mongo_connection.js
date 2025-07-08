@@ -11,7 +11,7 @@ import { ObserveMultiplexer } from './observe_multiplex';
 import { OplogObserveDriver } from './oplog_observe_driver';
 import { OPLOG_COLLECTION, OplogHandle } from './oplog_tailing';
 import { PollingObserveDriver } from './polling_observe_driver';
-// import { ChangeStreamObserveDriver } from './changestream_observe_driver';
+import { ChangeStreamObserveDriver } from './changestream_observe_driver';
 
 const FILE_ASSET_SUFFIX = 'Asset';
 const ASSETS_FOLDER = 'assets';
@@ -34,6 +34,7 @@ export const MongoConnection = function (url, options) {
     ignoreUndefined: true,
   }, userOptions);
 
+  console.log('mongoOptions:', mongoOptions);
 
 
   // Internally the oplog connections specify their own maxPoolSize
@@ -892,7 +893,7 @@ Object.assign(MongoConnection.prototype, {
       var matcher, sorter;
       
       // Check if Change Streams are available and enabled
-      var canUseChangeStreams = [
+      const canUseChangeStreams = [
         function () {
           // Change Streams require MongoDB 3.6+ and replica set
           return self._supportsChangeStreams && !ordered &&
@@ -983,7 +984,6 @@ Object.assign(MongoConnection.prototype, {
       if (canUseChangeStreams) {
         // Use dynamic import to avoid circular dependency issues
         try {
-          const { ChangeStreamObserveDriver } = require('./changestream_observe_driver');
           driverClass = ChangeStreamObserveDriver;
         } catch (error) {
           console.warn('Failed to load ChangeStreamObserveDriver, falling back to oplog/polling:', error.message);
