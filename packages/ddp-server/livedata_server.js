@@ -1432,6 +1432,28 @@ Object.assign(Server.prototype, {
       return true;
     });
   },
+  /**
+   * Register a publish handler function.
+   *
+   * @param name {String} identifier for query
+   * @param handler {Function} publish handler
+   * @param options {Object}
+   *
+   * Server will call handler function on each new subscription,
+   * either when receiving DDP sub message for a named subscription, or on
+   * DDP connect for a universal subscription.
+   *
+   * If name is null, this will be a subscription that is
+   * automatically established and permanently on for all connected
+   * client, instead of a subscription that can be turned on and off
+   * with subscribe().
+   *
+   * options to contain:
+   *  - (mostly internal) is_auto: true if generated automatically
+   *    from an autopublish hook. this is for cosmetic purposes only
+   *    (it lets us determine whether to print a warning suggesting
+   *    that you turn off autopublish).
+   */
 
   /**
    * @summary Publish a record set.
@@ -1441,7 +1463,6 @@ Object.assign(Server.prototype, {
    * @param {String|Object} name If String, name of the record set.  If Object, publications Dictionary of publish functions by name.  If `null`, the set has no name, and the record set is automatically sent to all connected clients.
    * @param {Function} func Function called on the server each time a client subscribes.  Inside the function, `this` is the publish handler object, described below.  If the client passed arguments to `subscribe`, the function is called with the same arguments.
    */
-  
   publish: function (name, handler, options) {
     var self = this;
 
