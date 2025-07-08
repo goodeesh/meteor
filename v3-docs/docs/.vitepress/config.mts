@@ -1,9 +1,10 @@
 import { defineConfig } from "vitepress";
 import metadata from "../generators/meteor-versions/metadata.generated";
 import llmstxt from "vitepress-plugin-llms";
+import { withMermaid } from "vitepress-plugin-mermaid";
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: "Docs",
   description: "Meteor.js Docs",
   head: [["link", { rel: "icon", href: "/logo.png" }]],
@@ -166,6 +167,10 @@ export default defineConfig({
           {
             text: "Cordova",
             link: "/about/cordova",
+          },
+          {
+            text: "Reactivity",
+            link: "/about/reactivity",
           },
           {
             text: "Modern Build Stack",
@@ -508,4 +513,15 @@ export default defineConfig({
       }),
     ],
   },
-});
+  // Optionally, you can configure mermaid
+  mermaid: {
+    // refer https://mermaid-js.github.io/mermaid/#/Setup for options
+  },
+  // Optionally set additional config for rendering markdown.
+  // Configure the Markdown-it instance.
+  markdown: {
+    config: (md) => {
+      // Use mermaid in markdown
+    },
+  },
+}));

@@ -135,6 +135,7 @@
 ### [standard-minifiers](https://github.com/meteor/meteor/tree/devel/packages/standard-minifiers) {#standard-minifiers}
 ### [static-html](https://github.com/meteor/meteor/tree/devel/packages/static-html) {#static-html}
 ### [static-html-tools](https://github.com/meteor/meteor/tree/devel/packages/static-html-tools) {#static-html-tools}
+### [tasks-common](https://github.com/meteor/meteor/tree/devel/packages/tasks-common) {#tasks-common}
 ### [test-helpers](https://github.com/meteor/meteor/tree/devel/packages/test-helpers) {#test-helpers}
 ### [test-in-browser](https://github.com/meteor/meteor/tree/devel/packages/test-in-browser) {#test-in-browser}
 ### [test-in-console](https://github.com/meteor/meteor/tree/devel/packages/test-in-console) {#test-in-console}
@@ -145,7 +146,6 @@
 ### [twitter-config-ui](https://github.com/meteor/meteor/tree/devel/packages/twitter-config-ui) {#twitter-config-ui}
 ### [twitter-oauth](https://github.com/meteor/meteor/tree/devel/packages/twitter-oauth) {#twitter-oauth}
 ### [typescript](https://github.com/meteor/meteor/tree/devel/packages/typescript) {#typescript}
-### [underscore](https://github.com/meteor/meteor/tree/devel/packages/underscore) {#underscore}
 ### [url](https://github.com/meteor/meteor/tree/devel/packages/url) {#url}
 ### [webapp](https://github.com/meteor/meteor/tree/devel/packages/webapp) {#webapp}
 ### [webapp-hashing](https://github.com/meteor/meteor/tree/devel/packages/webapp-hashing) {#webapp-hashing}
