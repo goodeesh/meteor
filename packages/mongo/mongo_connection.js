@@ -140,12 +140,6 @@ MongoConnection.prototype._checkChangeStreamSupport = async function() {
     
     self._supportsChangeStreams = isReplicaSet || isSharded;
     
-    if (self._supportsChangeStreams) {
-      console.log('MongoDB Change Streams are available and will be used for real-time updates');
-    } else {
-      console.log('MongoDB Change Streams not available (requires replica set or sharded cluster)');
-    }
-    
   } catch (error) {
     console.warn('Error checking Change Streams support:', error.message);
     self._supportsChangeStreams = false;
