@@ -895,14 +895,14 @@ Object.assign(MongoConnection.prototype, {
       // Check if Change Streams are available and enabled
       const canUseChangeStreams = [
         function () {
+          // Check if change streams are explicitly disabled
+          const mongoSettings = Meteor.settings?.packages?.mongo || {};
+          return mongoSettings.useChangeStreams || process.env.USE_CHANGE_STREAMS;
+        },
+        function () {
           // Change Streams require MongoDB 3.6+ and replica set
           return self._supportsChangeStreams && !ordered &&
             !callbacks._testOnlyPollCallback;
-        },
-        function () {
-          // Check if change streams are explicitly disabled
-          const mongoSettings = Meteor.settings?.packages?.mongo || {};
-          return mongoSettings.useChangeStreams !== false;
         },
         function () {
           // We need to be able to compile the selector
