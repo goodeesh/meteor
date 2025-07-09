@@ -79,7 +79,7 @@ export class ChangeStreamObserveDriver {
           if (!self._stopped) {
             self._restartChangeStream();
           }
-        }, 1000);
+        }, Meteor.settings.packages.mongo.changeStream.delay.error);
       }));
       
       this._changeStream.on('close', Meteor.bindEnvironment(() => {
@@ -89,7 +89,7 @@ export class ChangeStreamObserveDriver {
             if (!self._stopped) {
               self._restartChangeStream();
             }
-          }, 1000);
+          }, Meteor.settings.packages.mongo.changeStream.delay.close);
         }
       }));
       
@@ -107,16 +107,11 @@ export class ChangeStreamObserveDriver {
       const selector = this._cursorDescription.selector || {};
       const options = { ...this._cursorDescription.options };
       
-      // Remove some options that don't apply to find()
-      delete options.tailable;
-      delete options.oplogReplay;
-      
       // Find all existing documents
       const cursor = collection.find(selector, options);
-      const docs = await cursor.toArray();
       
       // Send 'added' for each existing document that matches our matcher
-      for (const doc of docs) {
+      for await (const doc of cursor) {
         if (this._stopped) return;
         
         if (this._matcher && this._matcher.documentMatches(doc).result) {

@@ -34,8 +34,6 @@ export const MongoConnection = function (url, options) {
     ignoreUndefined: true,
   }, userOptions);
 
-  console.log('mongoOptions:', mongoOptions);
-
 
   // Internally the oplog connections specify their own maxPoolSize
   // which we don't want to overwrite with any user defined value
@@ -897,7 +895,7 @@ Object.assign(MongoConnection.prototype, {
         function () {
           // Check if change streams are explicitly disabled
           const mongoSettings = Meteor.settings?.packages?.mongo || {};
-          return mongoSettings.useChangeStreams || process.env.USE_CHANGE_STREAMS;
+          return mongoSettings.reactivity === 'CHANGE_STREAMS' || process.env.METEOR_REACTIVITY === 'CHANGE_STREAMS';
         },
         function () {
           // Change Streams require MongoDB 3.6+ and replica set
