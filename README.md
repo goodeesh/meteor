@@ -1,97 +1,114 @@
-<div align="center">
-  <a href="https://www.meteor.com" target="_blank">
-    <img align="center" width="225" src="https://user-images.githubusercontent.com/841294/26841702-0902bbee-4af3-11e7-9805-0618da66a246.png">
-  </a>
-</div>
+# Meteor 2.12 for ARM64 (Ubuntu 24.04)
 
-<br>
+A fully functional build of Meteor 2.12 for ARM64 systems, specifically tested on Ubuntu 24.04.
 
-<div align="center">
+## Quick Start
 
-[![TravisCI Status](https://travis-ci.org/meteor/meteor.svg?branch=devel)](https://travis-ci.org/meteor/meteor)
-[![CircleCI Status](https://circleci.com/gh/meteor/meteor/tree/devel.svg?style=shield&circle-token=c2d3c041506bd493ef3795ffa4448684cfce97b8)](https://circleci.com/gh/meteor/meteor/tree/devel)
-[![built with Meteor](https://img.shields.io/badge/Meteor-2.12-green?logo=meteor&logoColor=white)](https://meteor.com)
-  
-</div>
+### Automated Installation
 
-<hr>
-
-Meteor is an **ultra-simple** environment for building **modern** web applications.
-
-<hr>
-
-- [Official Website](https://www.meteor.com)
-- [Installation](https://www.meteor.com/developers/install)
-- [Documentation](https://docs.meteor.com/#/full/)
-
-<hr>
-
-### 📚 **Create your applications using modern JavaScript**
-
-Benefit from the latest technology updates to rapidly prototype and develop your applications.
-
-<hr>
-
-### ✨ **Integrate technologies you already use**
-
-Use popular frameworks and tools right out-of-the-box. Focus on building features instead of configuring disparate components yourself.
-
-<hr>
-
-### 💻 **Build apps for any device**
-
-Use the same code whether you’re developing for web, iOS, Android, or desktop for a seamless update experience for your users.
-
-<hr>
-
-# 🔥 Getting Started
-
-How about trying a getting started tutorial in your favorite technology?
-
-| [<img align="left" width="25" src="https://www.quantumversity.com/wp-content/uploads/2020/11/Adding-Authentication-to-React-with-Auth0-Login-and-Profile.png"> React](https://react-tutorial.meteor.com/) |
-| - |
-| [<img align="left" width="25" src="https://progsoft.net/images/blaze-css-icon-3e80acb3996047afd09f1150f53fcd78e98c1e1b.png"> Blaze](https://blaze-tutorial.meteor.com/) |
-| [<img align="left" width="25" src="https://vuejs.org/images/logo.png"> Vue](https://vue-tutorial.meteor.com/) |
-| [<img align="left" width="25" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Svelte_Logo.svg/1200px-Svelte_Logo.svg.png"> Svelte](https://svelte-tutorial.meteor.com/) |
-
-Next, read the [documentation](https://docs.meteor.com/) and get some [examples](https://github.com/meteor/examples).
-
-# 🚀 Quick Start
-
-On your platform, use this line:
-
-```shell
-> npm install -g meteor
-```
- 
-🚀 To create a project:
-
-```shell
-> meteor create my-app
+```bash
+git clone https://github.com/shivendoodeshmukh/meteor-aarch64.git
+cd meteor-aarch64
+./install.sh
 ```
 
-☄️ Run it:
+### Manual Installation
 
-```shell
+See [INSTALL_UBUNTU_24.04.md](INSTALL_UBUNTU_24.04.md) for detailed step-by-step instructions.
+
+## What's Included
+
+- ✅ **Meteor 2.12** fully functional on ARM64
+- ✅ **Node.js 14.21.3** compiled for ARM64
+- ✅ **MongoDB 4.4.29** with ARM64 compatibility fixes
+- ✅ **All native modules** properly compiled
+- ✅ **OpenSSL 1.1.1** compatibility package
+- ✅ **Enhanced MongoDB startup** with JSON log format support
+
+## System Requirements
+
+- Ubuntu 24.04 LTS (ARM64)
+- 4GB+ RAM (8GB recommended)
+- 2GB+ free disk space
+- Internet connection for initial setup
+
+## Key Features
+
+### MongoDB ARM64 Fixes
+This build includes critical fixes for MongoDB on ARM64:
+- Enhanced log format detection (JSON vs text)
+- Improved replica set initialization
+- Timeout fallback mechanisms
+- Proper port file handling
+
+## Usage
+
+```bash
+# Create new project
+./meteor create my-app
+
+# Run project
 cd my-app
-meteor
+../meteor run
+
+# Access at http://localhost:3000
 ```
 
-# 🧱 Developer Resources
+## Files Structure
 
-**Building an application with Meteor?**
+```
+meteor-aarch64/
+├── install.sh                    # Automated installation script
+├── INSTALL_UBUNTU_24.04.md      # Detailed installation guide
+├── resources/
+│   └── libssl1.1_*.deb          # OpenSSL 1.1.1 compatibility package
+├── scripts/
+│   └── generate-dev-bundle.sh   # Development bundle build script
+├── meteor                       # Main Meteor executable
+└── tools/                       # Meteor tools with ARM64 fixes
+```
 
-* Deploy on [Meteor Cloud](https://www.meteor.com/cloud)
-* Discussion [Forums](https://forums.meteor.com/)
-* Join the Meteor community Slack by clicking this [invite link](https://join.slack.com/t/meteor-community/shared_invite/enQtODA0NTU2Nzk5MTA3LWY5NGMxMWRjZDgzYWMyMTEyYTQ3MTcwZmU2YjM5MTY3MjJkZjQ0NWRjOGZlYmIxZjFlYTA5Mjg4OTk3ODRiOTc).
-* Announcement list. Subscribe in the [footer](https://www.meteor.com/).
+## Installation Time
 
+- **First-time build**: Will take a while, depending on your system.
 
-Interested in helping or contributing to Meteor?  These resources will help:
+### Common Issues
 
-* [Core development guide](DEVELOPMENT.md)
-* [Contribution guidelines](CONTRIBUTING.md)
-* [Feature requests](https://github.com/meteor/meteor/discussions/)
-* [Issue tracker](https://github.com/meteor/meteor/issues)
+1. **OpenSSL errors**: Ensure `libssl1.1` package is installed
 
-To uninstall Meteor [read here](https://docs.meteor.com/install.html#uninstall).
+### Getting Help
+
+1. Check the detailed installation guide: [INSTALL_UBUNTU_24.04.md](INSTALL_UBUNTU_24.04.md)
+2. Open an issue and I might look into it, but no guarantees.
+
+## Technical Details
+
+### What Was Fixed
+
+1. **MongoDB Log Format**: Enhanced detection for JSON-formatted logs in MongoDB 4.4.29
+2. **Replica Set Init**: Improved timeout and fallback mechanisms
+3. **Type Conversion**: Fixed port number handling in MongoDB startup
+4. **Dependencies**: Proper OpenSSL 1.1.1 compatibility
+
+### Build Process
+
+The build process:
+1. Downloads Node.js 14.21.3 ARM64 binaries
+2. Downloads MongoDB 4.4.29 ARM64 binaries
+3. Compiles native Node.js modules (fibers, sqlite3, etc.)
+4. Applies ARM64-specific patches
+5. Packages everything into a development bundle
+
+## License
+
+Same as Meteor.js - MIT License
+
+---
+
+**Note**: This is an unofficial ARM64 build. For official x86_64 builds, use the standard Meteor installer.
+
+---
+
+## Original Meteor README
+
+For the original Meteor documentation, see README_ORIGINAL.md.
