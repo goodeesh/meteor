@@ -16,6 +16,8 @@ echo BUILDING DEV BUNDLE "$BUNDLE_VERSION" IN "$DIR"
 
 cd "$DIR"
 
+echo $(pwd)
+
 extractNodeFromTarGz() {
     LOCAL_TGZ="${CHECKOUT_DIR}/node_${PLATFORM}_v${NODE_VERSION}.tar.gz"
     if [ -f "$LOCAL_TGZ" ]
@@ -33,7 +35,7 @@ downloadNodeFromS3() {
     S3_TGZ="node_${UNAME}_${ARCH}_v${NODE_VERSION}.tar.gz"
     NODE_URL="https://${S3_HOST}/dev-bundle-node-${NODE_BUILD_NUMBER}/${S3_TGZ}"
     echo "Downloading Node from ${NODE_URL}" >&2
-    curl "${NODE_URL}" | tar zx --strip 1
+    curl "${NODE_URL}" | tar zx --strip-components 1
 }
 
 # Nodejs 14 official download source has been discontinued, we are switching to our custom source https://static.meteor.com
@@ -56,60 +58,73 @@ downloadReleaseCandidateNode() {
 }
 
 # Try each strategy in the following order:
-extractNodeFromTarGz || downloadNodeFromS3 || \
-  downloadOfficialNode14 || downloadReleaseCandidateNode
+extractNodeFromTarGz || downloadNodeFromS3 || downloadOfficialNode
 
-# On macOS, download MongoDB from mongodb.com. On Linux, download a custom build
-# that is compatible with current distributions. If a 32-bit Linux is used,
-# download a 32-bit legacy version from mongodb.com instead.
-MONGO_VERSION=$MONGO_VERSION_64BIT
-
-if [ $ARCH = "i686" ] && [ $OS = "linux" ]; then
-    MONGO_VERSION=$MONGO_VERSION_32BIT
-fi
-
-case $OS in
-    macos) MONGO_BASE_URL="https://fastdl.mongodb.org/osx" ;;
-    linux)
-        [ $ARCH = "i686" ] &&
-            MONGO_BASE_URL="https://fastdl.mongodb.org/linux" ||
-            MONGO_BASE_URL="https://github.com/meteor/mongodb-builder/releases/download/v${MONGO_VERSION}"
-        ;;
-esac
-
-
-if [ $OS = "macos" ] && [ "$(uname -m)" = "arm64" ] ; then
-  MONGO_NAME="mongodb-${OS}-x86_64-${MONGO_VERSION}"
+# Download Mongo from mongodb.com. Will download a 64-bit version of Mongo
+# by default. Will download a 32-bit version of Mongo if using a 32-bit based
+# OS.
+if [ "$ARCH" == "aarch64" ] ; then
+  MONGO_VERSION=$MONGO_VERSION_64BIT
+  # Download official MongoDB Ubuntu aarch64 binaries
+  MONGO_URL="https://fastdl.mongodb.org/linux/mongodb-linux-aarch64-ubuntu2004-4.4.29.tgz"
+  MONGO_NAME="mongodb-linux-aarch64-ubuntu2004-${MONGO_VERSION}"
+  echo "Downloading Mongo from ${MONGO_URL}"
+  curl -L "${MONGO_URL}" | tar zx
+  echo $(pwd)
+  echo $(ls)
 else
-  MONGO_NAME="mongodb-${OS}-${ARCH}-${MONGO_VERSION}"
+  MONGO_VERSION=$MONGO_VERSION_64BIT
+  if [ $ARCH = "i686" ]; then
+    MONGO_VERSION=$MONGO_VERSION_32BIT
+  fi
+  MONGO_NAME="mongodb-${OS}-${ARCH}-ubuntu1804-${MONGO_VERSION}"
+  MONGO_TGZ="${MONGO_NAME}.tgz"
+  MONGO_URL="http://fastdl.mongodb.org/${OS}/${MONGO_TGZ}"
+  echo "Downloading Mongo from ${MONGO_URL}"
+  curl "${MONGO_URL}" | tar zx
 fi
-
-MONGO_TGZ="${MONGO_NAME}.tgz"
-MONGO_URL="${MONGO_BASE_URL}/${MONGO_TGZ}"
-echo "Downloading Mongo from ${MONGO_URL}"
-curl -L "${MONGO_URL}" | tar zx
 
 # Put Mongo binaries in the right spot (mongodb/bin)
 mkdir -p "mongodb/bin"
 mv "${MONGO_NAME}/bin/mongod" "mongodb/bin"
-mv "${MONGO_NAME}/bin/mongos" "mongodb/bin"
+mv "${MONGO_NAME}/bin/mongo" "mongodb/bin"
+echo ${MONGO_NAME}
 rm -rf "${MONGO_NAME}"
 
 # export path so we use the downloaded node and npm
 export PATH="$DIR/bin:$PATH"
 
 cd "$DIR/lib"
-# Overwrite the bundled version with the latest version of npm.
-npm install "npm@$NPM_VERSION"
-npm config set python `which python3`
+# Use the NPM version that comes bundled with Node.js
+# npm install "npm@$NPM_VERSION"
+
 which node
 which npm
 npm version
 
+# Upgrade node-gyp to a version compatible with Python 3.9+ before any package installations
+echo "Upgrading node-gyp for Python 3.9+ compatibility..."
+cd "$DIR/lib/node_modules/npm"
+npm install node-gyp@9.4.1 --no-save
+# Also upgrade the node-gyp in npm-lifecycle if it exists
+if [ -d "node_modules/npm-lifecycle/node_modules/node-gyp" ]; then
+    cd "node_modules/npm-lifecycle"
+    npm install node-gyp@9.4.1 --no-save
+    cd "../.."
+fi
+cd "$DIR/lib"
+
 # Make node-gyp use Node headers and libraries from $DIR/include/node.
+echo $(ls)
+echo $(ls include)
 export HOME="$DIR"
 export USERPROFILE="$DIR"
 export npm_config_nodedir="$DIR"
+
+# Workaround for Python 3.9+ compatibility with old node-gyp
+export PYTHON=python3
+export npm_config_python=python3
+export GYP_MSVS_VERSION=2022
 
 INCLUDE_PATH="${DIR}/include/node"
 echo "Contents of ${INCLUDE_PATH}:"
@@ -185,14 +200,10 @@ delete moment/min
 # Remove esprima tests to reduce the size of the dev bundle
 find . -path '*/esprima-fb/test' | xargs rm -rf
 
-# Sanity check to see if we're not breaking anything by replacing npm
+# Using the NPM version bundled with Node.js
 INSTALLED_NPM_VERSION=$(cat "$DIR/lib/node_modules/npm/package.json" |
 xargs -0 node -e "console.log(JSON.parse(process.argv[1]).version)")
-if [ "$INSTALLED_NPM_VERSION" != "$NPM_VERSION" ]; then
-  echo "Error: Unexpected NPM version in lib/node_modules: $INSTALLED_NPM_VERSION"
-  echo "Update this check if you know what you're doing."
-  exit 1
-fi
+echo "Using bundled NPM version: $INSTALLED_NPM_VERSION"
 
 echo BUNDLING
 
