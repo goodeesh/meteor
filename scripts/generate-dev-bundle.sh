@@ -146,6 +146,9 @@ node "${CHECKOUT_DIR}/scripts/dev-bundle-server-package.js" > package.json
 # XXX For no apparent reason this npm install will fail with an EISDIR
 # error if we do not help it by creating the .npm/_locks directory.
 mkdir -p "${DIR}/.npm/_locks"
+npm set strict-ssl 0
+export NPM_CONFIG_STRICT_SSL=0
+export NODE_TLS_REJECT_UNAUTHORIZED=0
 npm install
 npm shrinkwrap
 
