@@ -94,6 +94,11 @@ rm -rf "${MONGO_NAME}"
 # export path so we use the downloaded node and npm
 export PATH="$DIR/bin:$PATH"
 
+# Set environment variables to bypass SSL verification for corporate environments
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+export npm_config_strict_ssl=false
+export npm_config_registry=https://registry.npmjs.org/
+
 cd "$DIR/lib"
 # Use the NPM version that comes bundled with Node.js
 # npm install "npm@$NPM_VERSION"
@@ -101,6 +106,17 @@ cd "$DIR/lib"
 which node
 which npm
 npm version
+
+# Comprehensive SSL and proxy bypass for corporate environments
+npm config set strict-ssl false
+npm config set registry https://registry.npmjs.org/
+npm config set ca null
+npm config set https-proxy null
+npm config set proxy null
+
+# Additional environment variables for SSL bypass
+export NODE_TLS_REJECT_UNAUTHORIZED=0
+export npm_config_strict_ssl=false
 
 # Upgrade node-gyp to a version compatible with Python 3.9+ before any package installations
 echo "Upgrading node-gyp for Python 3.9+ compatibility..."
