@@ -5,6 +5,13 @@
 
 set -e  # Exit on any error
 
+# Parse command line arguments
+FORCE_REBUILD=false
+if [ "$1" = "--force-rebuild" ] || [ "$1" = "-f" ]; then
+    FORCE_REBUILD=true
+    echo "🔄 Force rebuild requested"
+fi
+
 echo "🚀 Meteor 2.12 ARM64 Installation Script for Ubuntu 24.04"
 echo "============================================================="
 
@@ -62,20 +69,36 @@ fi
 
 # Step 3: Build development bundle
 echo ""
-echo "🔨 Building Meteor development bundle..."
-echo "This will take 15-30 minutes depending on your system..."
-echo "You can monitor progress in the terminal output."
+echo "🔨 Checking Meteor development bundle..."
 
-if [ ! -f "scripts/generate-dev-bundle.sh" ]; then
-    echo "❌ Error: generate-dev-bundle.sh script not found"
-    echo "Please make sure you're running this script from the meteor-aarch64 directory"
-    exit 1
+# Check if dev bundle tarball already exists and force rebuild is not requested
+if [ -f "dev_bundle_Linux_aarch64_14.21.3.tar.gz" ] && [ "$FORCE_REBUILD" = false ]; then
+    echo "✅ Development bundle already exists, skipping build"
+    echo "   Use --force-rebuild or -f to rebuild anyway"
+else
+    if [ "$FORCE_REBUILD" = true ]; then
+        echo "🔄 Force rebuilding development bundle..."
+        # Remove existing bundle to ensure clean rebuild
+        rm -f dev_bundle_Linux_aarch64_14.21.3.tar.gz
+        rm -rf dev_bundle
+    else
+        echo "Building Meteor development bundle..."
+    fi
+    
+    echo "This will take 15-30 minutes depending on your system..."
+    echo "You can monitor progress in the terminal output."
+
+    if [ ! -f "scripts/generate-dev-bundle.sh" ]; then
+        echo "❌ Error: generate-dev-bundle.sh script not found"
+        echo "Please make sure you're running this script from the meteor-aarch64 directory"
+        exit 1
+    fi
+
+    chmod +x scripts/generate-dev-bundle.sh
+    ./scripts/generate-dev-bundle.sh
+
+    echo "✅ Development bundle built successfully"
 fi
-
-chmod +x scripts/generate-dev-bundle.sh
-./scripts/generate-dev-bundle.sh
-
-echo "✅ Development bundle built successfully"
 
 # Step 4: Install Meteor Development Bundle
 echo ""
@@ -150,6 +173,11 @@ rm -rf "$TEST_DIR"
 
 echo ""
 echo "🎉 Installation completed successfully!"
+echo ""
+echo "Usage:"
+echo "  ./install.sh           - Install with existing dev bundle (if available)"
+echo "  ./install.sh -f        - Force rebuild dev bundle"
+echo "  ./install.sh --force-rebuild - Force rebuild dev bundle"
 echo ""
 echo "Next steps:"
 echo "1. Add Meteor to your PATH (optional):"
