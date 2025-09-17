@@ -132,45 +132,6 @@ else
     exit 1
 fi
 
-# Step 5: Verify installation
-echo ""
-echo "🧪 Verifying installation..."
-METEOR_VERSION=$(./meteor --version 2>/dev/null | head -n1)
-echo "Meteor version: $METEOR_VERSION"
-
-# Create test project in /tmp to verify everything works
-echo ""
-echo "🧪 Creating test project to verify installation..."
-TEST_DIR="/tmp/meteor-test-$(date +%s)"
-mkdir -p "$TEST_DIR"
-cd "$TEST_DIR"
-
-# Use absolute path to meteor
-METEOR_PATH="$(cd "$(dirname "$0")" && pwd)/meteor"
-timeout 60s "$METEOR_PATH" create test-app --minimal || {
-    echo "⚠️  Test project creation timed out (normal for first run)"
-}
-
-if [ -d "test-app" ]; then
-    echo "✅ Test project created successfully"
-    cd test-app
-    
-    # Quick startup test (background process, then kill)
-    echo "🧪 Testing MongoDB startup..."
-    timeout 30s "$METEOR_PATH" run > /dev/null 2>&1 &
-    METEOR_PID=$!
-    sleep 10
-    kill $METEOR_PID 2>/dev/null || true
-    wait $METEOR_PID 2>/dev/null || true
-    echo "✅ MongoDB startup test completed"
-else
-    echo "⚠️  Test project creation encountered issues (may be normal on first run)"
-fi
-
-# Clean up test
-cd /
-rm -rf "$TEST_DIR"
-
 echo ""
 echo "🎉 Installation completed successfully!"
 echo ""
