@@ -65,10 +65,17 @@ if [ ! -d "dev_bundle" ]; then
     exit 1
 fi
 
-# Check if dev_bundle tarball exists
-if [ ! -f "dev_bundle_Linux_aarch64_14.21.3.tar.gz" ]; then
-    echo "❌ Error: Development bundle tarball not found!"
-    echo "Please ensure dev_bundle_Linux_aarch64_14.21.3.tar.gz exists"
+# Check if dev_bundle tarball exists - but we'll recreate it from dev_bundle/
+if [ ! -d "dev_bundle" ]; then
+    echo "❌ Error: dev_bundle directory not found!"
+    echo "The dev_bundle must be fully built before creating a distribution."
+    exit 1
+fi
+
+# Verify dev_bundle has essential files
+if [ ! -f "dev_bundle/bin/node" ]; then
+    echo "❌ Error: dev_bundle/bin/node not found!"
+    echo "The dev_bundle appears to be incomplete. Please run './install.sh' to rebuild."
     exit 1
 fi
 
@@ -76,6 +83,18 @@ fi
 echo "📁 Creating distribution directory..."
 rm -rf dist
 mkdir -p "${DIST_DIR}"
+
+# Recreate the tarball from the actual dev_bundle directory
+# This ensures we include ALL files, especially bin/node
+echo "📦 Creating fresh dev_bundle tarball from dev_bundle/ directory..."
+echo "   (This ensures all binaries like bin/node are included)"
+
+# Create tarball with proper handling of symlinks
+# We need to be IN the dev_bundle directory when creating the tarball
+# so that relative symlinks work correctly
+echo "🔍 Creating tarball with symlink preservation..."
+(cd dev_bundle && tar -czf "../dev_bundle_Linux_aarch64_14.21.3.tar.gz" .)
+echo "✅ Fresh tarball created with all files"
 
 # Copy essential files
 echo "📋 Copying Meteor files..."
@@ -106,6 +125,31 @@ METEOR_WRAPPER_EOF
 chmod +x "${DIST_DIR}/meteor"
 
 cp dev_bundle_Linux_aarch64_14.21.3.tar.gz "${DIST_DIR}/"
+
+# Verify the tarball contains bin/node
+echo "🔍 Verifying tarball integrity..."
+# Check both the original and the copied tarball
+if tar -tzf "dev_bundle_Linux_aarch64_14.21.3.tar.gz" | grep -q "^\./bin/node$"; then
+    echo "✅ Tarball verified: bin/node is present"
+elif tar -tzf "dev_bundle_Linux_aarch64_14.21.3.tar.gz" | grep -q "^bin/node$"; then
+    echo "✅ Tarball verified: bin/node is present (without ./)"
+else
+    echo "❌ Error: Tarball is missing bin/node!"
+    echo ""
+    echo "Debug information:"
+    echo "   Checking what's actually in the tarball..."
+    tar -tzf "dev_bundle_Linux_aarch64_14.21.3.tar.gz" | grep "bin/" | head -20 || echo "   No bin/ directory found!"
+    echo ""
+    echo "   Checking what's in the tarball (first 50 files)..."
+    tar -tzf "dev_bundle_Linux_aarch64_14.21.3.tar.gz" | head -50
+    echo ""
+    echo "   Checking dev_bundle/bin/ directory..."
+    ls -lh dev_bundle/bin/ | head -20
+    echo ""
+    echo "This means the tarball was not created correctly."
+    echo "Please report this issue with the debug information above."
+    exit 1
+fi
 
 # Create a .git marker so Meteor knows it's running from a checkout
 # This prevents the "Can't get default release version" error
@@ -254,6 +298,33 @@ fi
 
 echo "📦 Extracting dev_bundle (this may take a minute)..."
 tar -xzf dev_bundle_Linux_aarch64_14.21.3.tar.gz
+
+# Verify extraction was successful
+if [ ! -f "dev_bundle/bin/node" ]; then
+    echo "❌ Error: dev_bundle/bin/node not found after extraction!"
+    echo "   The tarball appears to be incomplete or corrupted."
+    exit 1
+fi
+
+echo "✅ dev_bundle extracted successfully"
+
+# Rebuild native modules for compatibility with this system
+echo ""
+echo "🔧 Rebuilding native modules for system compatibility..."
+echo "   (This ensures compatibility between Ubuntu 22.04 and 24.04)"
+
+# Rebuild fibers module
+if [ -d "dev_bundle/lib/node_modules/fibers" ]; then
+    echo "   Rebuilding fibers..."
+    cd dev_bundle/lib/node_modules/fibers
+    ../../../../dev_bundle/bin/node build 2>&1 | grep -v "gyp info" || {
+        echo "⚠️  Warning: fibers rebuild had issues, but continuing..."
+    }
+    cd ../../../..
+    echo "✅ Native modules rebuilt"
+else
+    echo "⚠️  Warning: fibers module not found, skipping rebuild"
+fi
 
 # Verify installation
 if [ -d "dev_bundle" ] && [ -f "dev_bundle/.bundle_version.txt" ]; then
