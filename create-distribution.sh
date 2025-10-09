@@ -297,7 +297,8 @@ if [ ! -f "dev_bundle_Linux_aarch64_14.21.3.tar.gz" ]; then
 fi
 
 echo "📦 Extracting dev_bundle (this may take a minute)..."
-tar -xzf dev_bundle_Linux_aarch64_14.21.3.tar.gz
+mkdir -p dev_bundle
+tar -xzf dev_bundle_Linux_aarch64_14.21.3.tar.gz -C dev_bundle
 
 # Verify extraction was successful
 if [ ! -f "dev_bundle/bin/node" ]; then
